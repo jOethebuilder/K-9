@@ -1,11 +1,11 @@
-# k9-RFID-SPOOL-MANAGEMENT
-ESP32 RFID spool management system for 3D printing (K-9 project)
+# K.9-RFID-SPOOL-MANAGEMENT
+ESP32 RFID spool management system for 3D printing (K.9 project)
 
 ---
 
 ## What This Is
 
-K-9 is a dedicated spool management tool designed to:
+K.9 is a dedicated spool management tool designed to:
 - Read and write RFID/NFC filament tags
 - Support multiple printer formats
 - Work with a local Spoolman server
