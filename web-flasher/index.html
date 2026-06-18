@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>K-9 Installer Test</title>
+</head>
+<body>
+  <h2>K-9 Web Installer Test</h2>
+
+  <button onclick="test()">Test Connect</button>
+
+  <script>
+  async function test() {
+    try {
+      const port = await navigator.serial.requestPort();
+      await port.open({ baudRate: 115200 });
+      alert("ESP32 CONNECTED");
+      await port.close();
+    } catch (e) {
+      alert("FAILED: " + e);
+    }
+  }
+  </script>
+</body>
+</html>
