@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -36,6 +36,7 @@
       padding: 56px 20px 80px;
     }
 
+    /* ── HERO ── */
     .hero {
       display: flex;
       flex-direction: column;
@@ -50,6 +51,7 @@
       position: relative;
     }
 
+    /* corner ticks like the TFT splash */
     .hero::before, .hero::after,
     .hero .corner-bl, .hero .corner-br {
       content: '';
@@ -67,3 +69,323 @@
       font-family: 'Orbitron', sans-serif;
       font-weight: 900;
       font-size: clamp(72px, 18vw, 110px);
+      line-height: 1;
+      color: var(--orange);
+      letter-spacing: -2px;
+      text-shadow: 0 0 40px rgba(255,122,0,0.4);
+    }
+
+    .affirmative {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 14px;
+      letter-spacing: 6px;
+      color: var(--orange);
+      margin-top: 12px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .affirmative::before, .affirmative::after {
+      content: '';
+      display: block;
+      height: 1px;
+      width: 48px;
+      background: var(--orange);
+      opacity: 0.5;
+    }
+
+    .hero-divider {
+      width: 100%;
+      height: 1px;
+      background: var(--border);
+      margin: 20px 0;
+    }
+
+    .hero-byline {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 4px;
+      color: var(--muted);
+      text-transform: uppercase;
+      text-align: center;
+    }
+
+    .hero-sub {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 3px;
+      color: var(--muted);
+      text-transform: uppercase;
+      text-align: center;
+      margin-top: 4px;
+    }
+
+    .status-bar {
+      margin-top: 20px;
+      padding: 8px 20px;
+      border: 1px solid var(--orange-dim);
+      border-radius: 2px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 12px;
+      letter-spacing: 2px;
+      color: var(--orange);
+      text-align: center;
+    }
+
+    /* ── CARDS ── */
+    .card {
+      width: 100%;
+      max-width: 560px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 28px 32px;
+      margin-bottom: 16px;
+    }
+
+    .card-label {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 10px;
+      font-weight: 400;
+      letter-spacing: 4px;
+      color: var(--orange);
+      text-transform: uppercase;
+      margin-bottom: 20px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    /* ── STEPS ── */
+    .steps { display: flex; flex-direction: column; gap: 14px; }
+
+    .step { display: flex; align-items: flex-start; gap: 16px; }
+
+    .step-num {
+      flex-shrink: 0;
+      width: 24px; height: 24px;
+      border: 1px solid var(--orange-dim);
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      color: var(--orange);
+      margin-top: 1px;
+    }
+
+    .step-text { font-size: 14px; line-height: 1.6; color: var(--text); }
+    .step-text strong { color: var(--orange); font-weight: 500; }
+
+    /* ── INSTALL BUTTON ── */
+    .install-wrap {
+      display: flex;
+      justify-content: center;
+      margin-top: 28px;
+    }
+
+    esp-web-install-button::part(button) {
+      background: var(--orange);
+      color: #1a1200;
+      font-family: 'Orbitron', sans-serif;
+      font-weight: 700;
+      font-size: 12px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      padding: 14px 40px;
+      border: none;
+      border-radius: 2px;
+      cursor: pointer;
+      box-shadow: 0 0 28px rgba(255,122,0,0.3);
+      transition: box-shadow 0.2s, transform 0.1s;
+    }
+
+    esp-web-install-button::part(button):hover {
+      box-shadow: 0 0 44px rgba(255,122,0,0.55);
+      transform: translateY(-1px);
+    }
+
+    .unsupported-msg {
+      text-align: center;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.8;
+      padding: 12px 0;
+    }
+
+    .unsupported-msg a { color: var(--orange); text-decoration: none; }
+    .unsupported-msg a:hover { text-decoration: underline; }
+
+    /* ── PINOUT ── */
+    .wiring-note {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      color: var(--orange);
+      letter-spacing: 1px;
+      margin-bottom: 18px;
+      opacity: 0.75;
+    }
+
+    .pinout { width: 100%; border-collapse: collapse; }
+
+    .pinout th {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 2px;
+      color: var(--muted);
+      text-transform: uppercase;
+      padding: 0 0 10px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .pinout td {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 13px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .pinout tr:last-child td { border-bottom: none; }
+
+    .pin-esp   { color: var(--text); }
+    .pin-pn532 { color: var(--orange); }
+
+    .pin-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 2px;
+      font-size: 10px;
+      letter-spacing: 1px;
+      border: 1px solid;
+    }
+    .pin-badge.pwr  { border-color: var(--orange-dim); color: var(--orange); }
+    .pin-badge.gnd  { border-color: var(--muted);      color: var(--muted);  }
+    .pin-badge.data { border-color: var(--orange-dim); color: var(--orange); opacity: 0.7; }
+
+    /* ── FOOTER ── */
+    footer {
+      margin-top: 48px;
+      text-align: center;
+    }
+
+    .footer-brand {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 11px;
+      letter-spacing: 4px;
+      color: var(--orange);
+      text-transform: uppercase;
+    }
+
+    .footer-sub {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 8px;
+      letter-spacing: 1px;
+    }
+
+    .footer-sub a { color: var(--orange); text-decoration: none; }
+    .footer-sub a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="corner-bl"></div>
+    <div class="corner-br"></div>
+
+    <div class="logo-k9">K·9</div>
+
+    <div class="affirmative">Affirmative!</div>
+
+    <div class="hero-divider"></div>
+
+    <p class="hero-byline">Built by Joe the Builder</p>
+    <p class="hero-sub">RFID Spool Manager — Web Installer</p>
+
+    <div class="status-bar">Affirmative! K·9 ready.</div>
+  </div>
+
+  <!-- INSTALL -->
+  <div class="card">
+    <p class="card-label">Installation</p>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <p class="step-text">Connect your <strong>ESP32-2432S028R (CYD)</strong> board via USB</p>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <p class="step-text">Click <strong>Install K·9 Firmware</strong> below</p>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <p class="step-text">Select the correct <strong>serial port</strong> when prompted</p>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <p class="step-text">Click <strong>Install</strong> and wait for flashing to complete</p>
+      </div>
+    </div>
+
+    <div class="install-wrap">
+      <esp-web-install-button manifest="manifest.json">
+        <span slot="activate">Install K·9 Firmware</span>
+        <div slot="unsupported" class="unsupported-msg">
+          Web Serial not supported here.<br/>
+          Use <a href="https://www.google.com/chrome/" target="_blank">Chrome</a> or
+          <a href="https://www.microsoft.com/edge" target="_blank">Edge</a> on desktop.
+        </div>
+      </esp-web-install-button>
+    </div>
+  </div>
+
+  <!-- WIRING -->
+  <div class="card">
+    <p class="card-label">PN532 Wiring — I²C Mode</p>
+    <p class="wiring-note">PN532 must be set to I²C mode before connecting</p>
+    <table class="pinout">
+      <thead>
+        <tr>
+          <th>ESP32</th>
+          <th>PN532</th>
+          <th>Type</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="pin-esp">3.3V</td>
+          <td class="pin-pn532">VCC</td>
+          <td><span class="pin-badge pwr">POWER</span></td>
+        </tr>
+        <tr>
+          <td class="pin-esp">GND</td>
+          <td class="pin-pn532">GND</td>
+          <td><span class="pin-badge gnd">GROUND</span></td>
+        </tr>
+        <tr>
+          <td class="pin-esp">GPIO 27</td>
+          <td class="pin-pn532">SDA</td>
+          <td><span class="pin-badge data">I²C DATA</span></td>
+        </tr>
+        <tr>
+          <td class="pin-esp">GPIO 22</td>
+          <td class="pin-pn532">SCL</td>
+          <td><span class="pin-badge data">I²C CLOCK</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <footer>
+    <p class="footer-brand">K·9 — Built by Joe the Builder</p>
+    <p class="footer-sub">
+      <a href="https://github.com/jOethebuilder/k9-RFID-SPOOL-MANAGEMENT" target="_blank">GitHub</a>
+      &nbsp;·&nbsp; MIT License
+    </p>
+  </footer>
+
+</body>
+</html>
+
