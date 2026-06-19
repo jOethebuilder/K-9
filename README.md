@@ -74,4 +74,4 @@ MIT
 
 Click here to flash the ESP32:
 
-https://joethebuilder.github.io/k9-RFID-SPOOL-MANAGEMENT/web-flasher/index.html
+(https://joethebuilder.github.io/k9-RFID-SPOOL-MANAGEMENT/web-flasher/)
