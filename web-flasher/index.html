@@ -1,106 +1,69 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>K.9 RFID Spool Management — Web Installer</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>K·9 RFID Spool Management — Web Installer</title>
   <script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #1a1200;
+      --bg-card:  #211800;
+      --orange:   #FF7A00;
+      --orange-dim: #7a3a00;
+      --orange-glow: rgba(255,122,0,0.18);
+      --text:     #e8d9c0;
+      --muted:    #7a6a50;
+      --border:   #3a2800;
+    }
+
+    html, body {
+      min-height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+    }
+
     body {
-      background: #000;
-      color: #e6e6e6;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-      margin: 0;
-      padding: 2rem 1rem;
-      text-align: center;
+      padding: 56px 20px 80px;
     }
-    h1 {
-      color: #1a6aff;
-      letter-spacing: 4px;
-      font-size: 2rem;
-      margin-bottom: 0.25rem;
-    }
-    .subtitle {
-      color: #4a7acc;
-      font-size: 0.85rem;
-      letter-spacing: 2px;
-      margin-bottom: 2rem;
-    }
-    .card {
-      background: #0a0a0a;
-      border: 1px solid #1a1a1a;
-      border-radius: 12px;
-      padding: 2rem;
-      max-width: 420px;
-      width: 100%;
-    }
-    .steps {
-      text-align: left;
-      font-size: 0.9rem;
-      line-height: 1.6;
-      color: #aaa;
-      margin-bottom: 1.5rem;
-    }
-    .steps li {
-      margin-bottom: 0.5rem;
-    }
-    esp-web-install-button {
-      --esp-tools-button-color: #1a6aff;
-    }
-    .footer {
-      margin-top: 2rem;
-      font-size: 0.75rem;
-      color: #444;
-      letter-spacing: 2px;
-    }
-    .pinout {
-      margin-top: 1.5rem;
-      font-size: 0.8rem;
-      color: #666;
-      text-align: left;
-      background: #0a0a0a;
-      border-radius: 8px;
-      padding: 1rem;
-      font-family: monospace;
-    }
-    .pinout div {
+
+    .hero {
       display: flex;
-      justify-content: space-between;
-      padding: 2px 0;
+      flex-direction: column;
+      align-items: center;
+      margin-bottom: 52px;
+      width: 100%;
+      max-width: 560px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 48px 32px 40px;
+      background: var(--bg-card);
+      position: relative;
     }
-    .pinout span.label { color: #1a6aff; }
-  </style>
-</head>
-<body>
 
-  <h1>K.9</h1>
-  <div class="subtitle">RFID SPOOL MANAGEMENT — WEB INSTALLER</div>
+    .hero::before, .hero::after,
+    .hero .corner-bl, .hero .corner-br {
+      content: '';
+      position: absolute;
+      width: 16px; height: 16px;
+      border-color: var(--orange-dim);
+      border-style: solid;
+    }
+    .hero::before  { top: 8px;    left: 8px;    border-width: 2px 0 0 2px; }
+    .hero::after   { top: 8px;    right: 8px;   border-width: 2px 2px 0 0; }
+    .hero .corner-bl { bottom: 8px; left: 8px;  border-width: 0 0 2px 2px; }
+    .hero .corner-br { bottom: 8px; right: 8px; border-width: 0 2px 2px 0; }
 
-  <div class="card">
-    <ol class="steps">
-      <li>Connect your ESP32-2432S028R (CYD) board via USB</li>
-      <li>Click the install button below</li>
-      <li>Select the correct serial port</li>
-      <li>Click Install and wait for flashing to complete</li>
-    </ol>
-
-    <esp-web-install-button manifest="manifest.json"></esp-web-install-button>
-
-    <div class="pinout">
-      <div><span class="label">PN532 must be in I2C mode</span></div>
-      <div><span>3.3V</span><span>VCC</span></div>
-      <div><span>GND</span><span>GND</span></div>
-      <div><span>GPIO 27</span><span>SDA</span></div>
-      <div><span>GPIO 22</span><span>SCL</span></div>
-    </div>
-  </div>
-
-  <div class="footer">BUILT BY JOE THE BUILDER</div>
-
-</body>
-</html>
+    .logo-k9 {
+      font-family: 'Orbitron', sans-serif;
+      font-weight: 900;
+      font-size: clamp(72px, 18vw, 110px);
