@@ -1,7 +1,7 @@
 /*
   BoxRFID Touch UI - ESP32-2432S028R (DIYMalls / CYD) + PN532 I2C
   ===========================================================================
-  Version: V4.2.1
+  Version: K.9 v1.0
 
   Hardware:
     - ESP32-2432S028R (CYD 2.8" Resistive Touch, DIYmalls.com)
@@ -2529,7 +2529,7 @@ static void drawMainMenuStatus() {
   tft.fillRect(0, TFT_H - UI_STATUS_H + 1, TFT_W, UI_STATUS_H - 1, TFT_BLACK);
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
   tft.setTextDatum(MC_DATUM);
-  tft.drawString("BoxRFID OpenSpool Edition by TinkerBarn", TFT_W / 2, TFT_H - UI_STATUS_H / 2, 1);
+  tft.drawString("K.9 RFID Spool Manager — Built by Joe the Builder", TFT_W / 2, TFT_H - UI_STATUS_H / 2, 1);
   tft.setTextDatum(TL_DATUM);
 }
 
