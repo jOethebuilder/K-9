@@ -36,10 +36,15 @@
 // --- Display ---
 TFT_eSPI tft = TFT_eSPI();
 
-// --- Touch ---
-#define TOUCH_CS  33
-#define TOUCH_IRQ 36
-XPT2046_Touchscreen touch(TOUCH_CS, TOUCH_IRQ);
+// --- Touch (VSPI bus) ---
+#define XPT2046_CLK  25
+#define XPT2046_MISO 39
+#define XPT2046_MOSI 32
+#define XPT2046_CS   33
+#define XPT2046_IRQ  36
+SPIClass touchscreenSPI = SPIClass(VSPI);
+XPT2046_Touchscreen touch(XPT2046_CS, XPT2046_IRQ);
+
 
 // --- PN532 I2C pins ---
 #define PN532_SDA 27
@@ -47,14 +52,14 @@ XPT2046_Touchscreen touch(TOUCH_CS, TOUCH_IRQ);
 Adafruit_PN532 nfc(PN532_SDA, PN532_SCL);
 
 // --- K.9 Color Palette (RGB565) ---
-#define COLOR_BG        0x1082   // Dark brown/black  ~#1a1200
-#define COLOR_CARD      0x2082   // Slightly lighter  ~#211800
-#define COLOR_ORANGE    0xFB60   // Orange            ~#FF7A00
-#define COLOR_ORANGE_DIM 0x7940  // Dim orange        ~#7a3a00
-#define COLOR_TEXT      0xEDB0   // Warm off-white    ~#e8d9c0
-#define COLOR_MUTED     0x7528   // Muted brown       ~#7a6a50
-#define COLOR_WHITE     0xFFFF
-#define COLOR_RED       0xF800
+#define COLOR_BG         0x0000
+#define COLOR_CARD       0x2082
+#define COLOR_ORANGE     0xFB60
+#define COLOR_ORANGE_DIM 0x7940
+#define COLOR_TEXT       0xEDB0
+#define COLOR_MUTED      0x7528
+#define COLOR_WHITE      0xFFFF
+#define COLOR_RED        0xF800
 
 // --- PN532 present flag ---
 bool nfcReady = false;
@@ -72,19 +77,14 @@ String tagCompat = "";
 //  HELPERS
 // ============================================================
 
-// Draw corner tick marks like the web flasher hero box
 void drawCornerTicks(int x, int y, int w, int h, uint16_t color) {
-  int t = 10; // tick length
-  // top-left
+  int t = 10;
   tft.drawFastHLine(x, y, t, color);
   tft.drawFastVLine(x, y, t, color);
-  // top-right
   tft.drawFastHLine(x + w - t, y, t, color);
   tft.drawFastVLine(x + w - 1, y, t, color);
-  // bottom-left
   tft.drawFastHLine(x, y + h - 1, t, color);
   tft.drawFastVLine(x, y + h - t, t, color);
-  // bottom-right
   tft.drawFastHLine(x + w - t, y + h - 1, t, color);
   tft.drawFastVLine(x + w - 1, y + h - t, t, color);
 }
@@ -95,44 +95,33 @@ void drawCornerTicks(int x, int y, int w, int h, uint16_t color) {
 
 void drawBootScreen() {
   tft.fillScreen(COLOR_BG);
-
-  // Corner ticks on full screen
   drawCornerTicks(4, 4, 312, 232, COLOR_ORANGE_DIM);
 
-  // Big K·9 title
   tft.setTextDatum(TC_DATUM);
   tft.setTextColor(COLOR_ORANGE, COLOR_BG);
   tft.setTextSize(5);
   tft.drawString("K.9", 160, 32);
 
-  // Flanking lines + Affirmative!
   tft.drawFastHLine(20,  98, 60, COLOR_ORANGE);
   tft.drawFastHLine(240, 98, 60, COLOR_ORANGE);
   tft.setTextSize(1);
   tft.setTextColor(COLOR_ORANGE, COLOR_BG);
   tft.drawString("Affirmative!", 160, 93);
 
-  // Divider
   tft.drawFastHLine(20, 112, 280, COLOR_ORANGE_DIM);
 
-  // Built by / version
   tft.setTextColor(COLOR_MUTED, COLOR_BG);
   tft.drawString("BUILT BY JOE THE BUILDER", 160, 122);
   tft.drawString("RFID SPOOL MANAGER v0.3", 160, 136);
 
-  // Loading bar background
   tft.drawRect(20, 158, 280, 6, COLOR_ORANGE_DIM);
-
-  // Animate loading bar
   for (int i = 0; i <= 280; i += 4) {
     tft.fillRect(20, 159, i, 4, COLOR_ORANGE);
     delay(10);
   }
 
-  // Status line
   tft.setTextColor(COLOR_ORANGE, COLOR_BG);
   tft.drawString("Affirmative! K.9 ready.", 160, 172);
-
   delay(1200);
 }
 
@@ -143,7 +132,6 @@ void drawBootScreen() {
 void drawHomeScreen() {
   tft.fillScreen(COLOR_BG);
 
-  // Header bar
   tft.fillRect(0, 0, 320, 24, COLOR_CARD);
   tft.drawFastHLine(0, 24, 320, COLOR_ORANGE_DIM);
   tft.setTextColor(COLOR_ORANGE, COLOR_CARD);
@@ -151,16 +139,13 @@ void drawHomeScreen() {
   tft.setTextDatum(MC_DATUM);
   tft.drawString("K.9 RFID SPOOL MANAGEMENT", 160, 12);
 
-  // NFC status badge
   if (!nfcReady) {
-    tft.fillRect(4, 28, 312, 16, COLOR_BG);
     tft.setTextColor(COLOR_RED, COLOR_BG);
     tft.setTextDatum(MC_DATUM);
     tft.setTextSize(1);
     tft.drawString("! NO READER CONNECTED !", 160, 36);
   }
 
-  // Scan button
   tft.fillRect(40, 60, 240, 56, COLOR_CARD);
   tft.drawRect(40, 60, 240, 56, COLOR_ORANGE);
   tft.setTextColor(COLOR_ORANGE, COLOR_CARD);
@@ -168,16 +153,13 @@ void drawHomeScreen() {
   tft.setTextDatum(MC_DATUM);
   tft.drawString("SCAN TAG", 160, 88);
 
-  // Hint
   tft.setTextSize(1);
   tft.setTextColor(COLOR_MUTED, COLOR_BG);
   tft.drawString("Hold tag near reader", 160, 140);
   tft.drawString("then tap SCAN TAG", 160, 154);
 
-  // Corner ticks
   drawCornerTicks(4, 4, 312, 232, COLOR_ORANGE_DIM);
 
-  // Footer
   tft.setTextColor(COLOR_MUTED, COLOR_BG);
   tft.drawString("v0.3 - Built by Joe the Builder", 160, 226);
 }
@@ -204,7 +186,6 @@ void drawScanningScreen() {
   tft.setTextColor(COLOR_MUTED, COLOR_BG);
   tft.drawString("Hold tag near reader", 160, 120);
 
-  // Concentric rings
   for (int r = 20; r <= 60; r += 20) {
     tft.drawCircle(160, 185, r, COLOR_ORANGE_DIM);
   }
@@ -227,7 +208,6 @@ void drawResultScreen() {
   tft.drawString("K.9 RFID SPOOL MANAGEMENT", 160, 12);
 
   tft.setTextDatum(TL_DATUM);
-
   tft.setTextColor(COLOR_MUTED, COLOR_BG);
   tft.drawString("TAG TYPE:", 20, 40);
   tft.setTextColor(COLOR_TEXT, COLOR_BG);
@@ -243,7 +223,6 @@ void drawResultScreen() {
   tft.setTextColor(COLOR_ORANGE, COLOR_BG);
   tft.drawString(tagCompat, 20, 130);
 
-  // Back button
   tft.fillRect(40, 175, 240, 48, COLOR_CARD);
   tft.drawRect(40, 175, 240, 48, COLOR_ORANGE_DIM);
   tft.setTextColor(COLOR_TEXT, COLOR_CARD);
@@ -285,18 +264,18 @@ void drawNoReaderScreen() {
 void setup() {
   Serial.begin(115200);
 
-  // Display
-  tft.init();
-  tft.setRotation(1);
-  tft.fillScreen(COLOR_BG);
+ tft.init();
+tft.setRotation(1);
+ledcAttach(21, 5000, 8);
+ledcWrite(21, 255);
+tft.fillScreen(TFT_RED);
 
-  // Touch
-  touch.begin();
+touchscreenSPI.begin(XPT2046_CLK, XPT2046_MISO, XPT2046_MOSI, XPT2046_CS);
+touch.begin(touchscreenSPI);
+touch.setRotation(1);
 
-  // Boot screen first — display test before NFC
   drawBootScreen();
 
-  // PN532 init — graceful, does not hang
   Wire.begin(PN532_SDA, PN532_SCL);
   nfc.begin();
   uint32_t versiondata = nfc.getFirmwareVersion();
@@ -325,13 +304,11 @@ void loop() {
     int y = map(p.y, 200, 3700, 0, 240);
 
     if (currentScreen == NO_READER) {
-      // Tap anywhere to go to home (reader-less mode)
       currentScreen = HOME;
       drawHomeScreen();
     }
 
     if (currentScreen == HOME) {
-      // SCAN button
       if (x > 40 && x < 280 && y > 60 && y < 116) {
         if (nfcReady) {
           currentScreen = SCANNING;
@@ -349,7 +326,6 @@ void loop() {
     }
 
     if (currentScreen == RESULT) {
-      // BACK button
       if (x > 40 && x < 280 && y > 175 && y < 223) {
         currentScreen = HOME;
         drawHomeScreen();
