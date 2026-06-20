@@ -1,5 +1,5 @@
 /*
-  BoxRFID Touch UI - ESP32-2432S028R (DIYMalls / CYD) + PN532 I2C
+  K.9 UI - ESP32-2432S028R (DIYMalls / CYD) + PN532 I2C
   ===========================================================================
   Version: K.9 v1.0
 
