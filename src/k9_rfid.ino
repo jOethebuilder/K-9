@@ -1,7 +1,7 @@
 /*
-  ""K.9"" UI - ESP32-2432S028R (DIYMalls / CYD) + PN532 I2C
+  BoxRFID Touch UI - ESP32-2432S028R (DIYMalls / CYD) + PN532 I2C
   ===========================================================================
-  Version: ""K.9"" v1.0
+  Version: V4.1
 
   Hardware:
     - ESP32-2432S028R (CYD 2.8" Resistive Touch, DIYmalls.com)
@@ -155,8 +155,6 @@ static const char* PREF_OS_READ_INT = "osrdint";
 static const char* PREF_WIFI_ENABLED = "wifi_on";
 static const char* PREF_WIFI_SSID = "ssid";
 static const char* PREF_WIFI_PASS = "pass";
-static const char* PREF_SNAP_HOST = "snap_host";
-static const char* PREF_SNAP_PORT = "snap_port";
 static const char* PREF_QIDI_USE_CFG_P4 = "cfgp4";
 static const char* PREF_QIDI_USE_CFG_Q2 = "cfgq2";
 static const char* PREF_QIDI_USE_CFG_M4 = "cfgm4";
@@ -175,7 +173,6 @@ static const char* PREF_NS_MFG_OS = "mfgo";
 static const char* PREF_NS_VAR_OS = "varo";
 static const char* PREF_QIDI_PRINTER = "qprinter";
 static const char* PREF_LIST_BLOB = "blob";
-static const char* PREF_LIST_JSON = "json";
 
 // ==================== Touch calibration defaults ====================
 static const int DEF_TS_MINX = 200;
@@ -200,8 +197,8 @@ static int TFT_H = 240;
 static const int UI_HEADER_H = 32;
 static const int UI_STATUS_H = 24;
 
-static const char* APP_VERSION = "V4.2.1";
-static const char* WIFI_HOSTNAME = ""K.9"";
+static const char* APP_VERSION = "V4.1";
+static const char* WIFI_HOSTNAME = "boxrfid";
 
 static const int BL_PWM_FREQ = 5000;
 static const int BL_PWM_RES = 8;
@@ -495,7 +492,7 @@ enum UiStrId : uint16_t {
 
 static const char* const UI_STR[LANG_COUNT][STR_COUNT] = {
   {
-    "K.9 RFID Spool Manager,"Tag Lesen","Tag Schreiben","Auto: AN","Auto: AUS","Bereit zum Lesen",
+    "BoxRFID - Hauptmenue","Tag Lesen","Tag Schreiben","Auto: AN","Auto: AUS","Bereit zum Lesen",
     "Konfiguration","Material auswaehlen","Farbe auswaehlen","Warte auf Tag...","NFC beschaeftigt!","Kein Tag gefunden","Auth fehlgeschlagen!",
     "Lesen fehlgeschlagen!","Lesen: Tag erkannt","Schreiben fehlgeschlagen!","Schreiben erfolgreich!","Auto: Tag erkannt","Zurueck",
     "Tag Informationen","Hersteller","Material","Farbe","FEHLER: PN532 nicht gefunden!","Lesen","Schreiben","Einstellungen","Sprache","Sprache waehlen",
@@ -504,7 +501,7 @@ static const char* const UI_STR[LANG_COUNT][STR_COUNT] = {
     "Dunkelblau","Lavendel","Lime","Royalblau","Himmelblau","Violett","Rosa","Rot","Beige","Silber","Braun","Khaki","Orange","Bronze"
   },
   {
-    "K.9 RFID Spool Manager","Read Tag","Write Tag","Auto: ON","Auto: OFF","Ready to read",
+    "BoxRFID - Main Menu","Read Tag","Write Tag","Auto: ON","Auto: OFF","Ready to read",
     "Configure","Select material","Select color","Waiting for tag...","NFC busy!","No tag found","Auth failed!",
     "Read failed!","Read: tag detected","Write failed!","Write successful!","Auto: tag detected","Back",
     "Tag information","Manufacturer","Material","Color","ERROR: PN532 not found!","Read","Write","Settings","Language","Select language",
@@ -513,7 +510,7 @@ static const char* const UI_STR[LANG_COUNT][STR_COUNT] = {
     "Dark Blue","Lavender","Lime","Royal Blue","Sky Blue","Violet","Rose","Red","Beige","Silver","Brown","Khaki","Orange","Bronze"
   },
   {
-    "K.9  RFID Spool Manager","Leer Tag","Escribir Tag","Auto: ON","Auto: OFF","Listo para leer",
+    "BoxRFID - Menu","Leer Tag","Escribir Tag","Auto: ON","Auto: OFF","Listo para leer",
     "Configurar","Elegir material","Elegir color","Esperando tag...","NFC ocupado!","No se encontro tag","Fallo de auth!",
     "Fallo de lectura!","Leido: tag detectado","Fallo de escritura!","Escritura OK!","Auto: tag detectado","Atras",
     "Info del tag","Fabricante","Material","Color","ERROR: PN532 no encontrado!","Leer","Escribir","Ajustes","Idioma","Elegir idioma",
@@ -522,7 +519,7 @@ static const char* const UI_STR[LANG_COUNT][STR_COUNT] = {
     "Azul oscuro","Lavanda","Lima","Azul rey","Azul cielo","Violeta","Rosado","Rojo","Beige","Plata","Marron","Caqui","Naranja","Bronce"
   },
   {
-    "K.9 RFID Spool Manager","Ler Tag","Escrever Tag","Auto: ON","Auto: OFF","Pronto para ler",
+    "BoxRFID - Menu","Ler Tag","Escrever Tag","Auto: ON","Auto: OFF","Pronto para ler",
     "Configurar","Escolher material","Escolher cor","Aguardando tag...","NFC ocupado!","Nenhum tag","Falha de auth!",
     "Falha na leitura!","Leitura: tag detectado","Falha na escrita!","Escrita OK!","Auto: tag detectado","Voltar",
     "Info do tag","Fabricante","Material","Cor","ERRO: PN532 nao encontrado!","Ler","Escrever","Definicoes","Idioma","Selecionar idioma",
@@ -531,7 +528,7 @@ static const char* const UI_STR[LANG_COUNT][STR_COUNT] = {
     "Azul escuro","Lavanda","Lima","Azul royal","Azul ceu","Violeta","Rose","Vermelho","Bege","Prata","Marrom","Caqui","Laranja","Bronze"
   },
   {
-    "K.9 RFID Spool Manager","Lire Tag","Ecrire Tag","Auto: ON","Auto: OFF","Pret a lire",
+    "BoxRFID - Menu","Lire Tag","Ecrire Tag","Auto: ON","Auto: OFF","Pret a lire",
     "Configurer","Choisir mat.","Choisir couleur","Attente du tag...","NFC occupe!","Aucun tag","Auth echouee!",
     "Lecture echouee!","Lu: tag detecte","Ecriture echouee!","Ecriture OK!","Auto: tag detecte","Retour",
     "Info du tag","Fabricant","Materiau","Couleur","ERREUR: PN532 introuvable!","Lire","Ecrire","Reglages","Langue","Choisir langue",
@@ -540,7 +537,7 @@ static const char* const UI_STR[LANG_COUNT][STR_COUNT] = {
     "Bleu fonce","Lavande","Citron vert","Bleu royal","Bleu ciel","Violet","Rose","Rouge","Beige","Argent","Marron","Kaki","Orange","Bronze"
   },
   {
-    "K.9 RFID Spool Manager principale","Leggi tag","Scrivi tag","Auto: ON","Auto: OFF","Pronto per leggere",
+    "BoxRFID - Menu principale","Leggi tag","Scrivi tag","Auto: ON","Auto: OFF","Pronto per leggere",
     "Configura","Seleziona materiale","Seleziona colore","In attesa del tag...","NFC occupato!","Nessun tag trovato","Auth fallita!",
     "Lettura fallita!","Lettura: tag rilevato","Scrittura fallita!","Scrittura riuscita!","Auto: tag rilevato","Indietro",
     "Informazioni tag","Produttore","Materiale","Colore","ERRORE: PN532 non trovato!","Leggi","Scrivi","Impostazioni","Lingua","Seleziona lingua",
@@ -594,11 +591,6 @@ static const char* const TXT_SLICER[LANG_COUNT]             = {"Slicer","Slicer"
 static const char* const TXT_FILAMENT_PROFILE[LANG_COUNT]   = {"Filamentprofil Name","Filament profile name","Nombre perfil filamento","Nome perfil filamento","Nom profil filament","Nome profilo filamento"};
 static const char* const TXT_WRITE[LANG_COUNT]              = {"Schreiben","Write","Escribir","Escrever","Ecrire","Scrivi"};
 static const char* const TXT_TAG_CLEAR[LANG_COUNT]          = {"Tag loeschen","Clear tag","Borrar tag","Limpar tag","Effacer tag","Cancella tag"};
-static const char* const TXT_SEND_TAG[LANG_COUNT]           = {"Tag senden","Send tag","Enviar tag","Enviar tag","Envoyer tag","Invia tag"};
-static const char* const TXT_SEND_SHORT[LANG_COUNT]         = {"Senden","Send","Enviar","Enviar","Envoyer","Invia"};
-static const char* const TXT_SEND_TO_U1[LANG_COUNT]         = {"Tag an Snapmaker U1 senden","Send tag to Snapmaker U1","Enviar tag a Snapmaker U1","Enviar tag para Snapmaker U1","Envoyer tag vers Snapmaker U1","Invia tag a Snapmaker U1"};
-static const char* const TXT_SEND_NEEDS_WIFI1[LANG_COUNT]   = {"Zuerst WLAN aktivieren","Enable Wi-Fi first","Active primero Wi-Fi","Ative primeiro Wi-Fi","Activez d'abord Wi-Fi","Attiva prima Wi-Fi"};
-static const char* const TXT_SEND_NEEDS_WIFI2[LANG_COUNT]   = {"und U1 Host konfigurieren","and configure U1 host","y configure host U1","e configure host U1","et configurez hote U1","e configura host U1"};
 static const char* const TXT_NUMPAD[LANG_COUNT]             = {"Zahlen","Numbers","Numeros","Numeros","Nombres","Numeri"};
 static const char* const TXT_TAG_DETECTED[LANG_COUNT]       = {"Tag erkannt","Tag detected","Tag detectado","Tag detectado","Tag detecte","Tag rilevato"};
 static const char* const TXT_READING_TAG[LANG_COUNT]       = {"Tag lesen...","Reading Tag...","Leyendo tag...","Lendo tag...","Lecture du tag...","Lettura tag..."};
@@ -805,8 +797,6 @@ enum UIState {
   UI_SD_FORMAT_CONFIRM,
   UI_SD_CONTENT,
   UI_WIFI_DEBUG,
-  UI_SEND_SELECT,
-  UI_SEND_OVERWRITE_CONFIRM,
 
   UI_MESSAGE_OK,
   UI_KEYBOARD
@@ -821,8 +811,6 @@ static UIState uiBeforeKeyboard = UI_MAIN;
 static bool wifiEnabled = false;
 static char wifiSsid[33] = "";
 static char wifiPassword[65] = "";
-static char snapmakerHost[65] = "192.168.1.10";
-static char snapmakerPort[6] = "7125";
 static bool useOfficialListPlus4 = false;
 static bool useOfficialListQ2 = false;
 static bool useOfficialListMax4 = false;
@@ -912,38 +900,6 @@ static uint32_t openSpoolReadCancelUntil = 0;
 static bool openSpoolCancelShown = false;
 
 static bool needRedraw = true;
-
-struct SnapmakerSendTag {
-  bool valid;
-  char source[12];
-  char vendor[ITEM_NAME_MAX + 1];
-  char mainType[ITEM_NAME_MAX + 1];
-  char subType[ITEM_NAME_MAX + 1];
-  char colorHex[8];
-  int alpha;
-  int minTemp;
-  int maxTemp;
-  int bedTemp;
-  uint8_t uid[10];
-  uint8_t uidLen;
-};
-
-static SnapmakerSendTag sendTag = {};
-static uint8_t pendingSendToolHead = 0;
-static bool sendFromWriteMode = false;
-static UIState sendReturnState = UI_MAIN;
-
-struct SnapmakerToolHeadState {
-  bool known;
-  bool empty;
-  char material[ITEM_NAME_MAX + 1];
-  char subtype[ITEM_NAME_MAX + 1];
-  char colorHex[8];
-};
-
-static SnapmakerToolHeadState snapToolHeads[4] = {};
-static bool snapToolHeadsKnown = false;
-static char snapToolHeadStatus[48] = "";
 
 // material UI
 static int matListPage = 0;
@@ -1086,12 +1042,6 @@ static bool authBlockWithDefaultKeyA(uint8_t* uid, uint8_t uidLen, uint8_t block
 static bool readBlock(uint8_t block, uint8_t* data);
 static bool writeBlock(uint8_t block, const uint8_t* data);
 static void drawTagInfoPopup(uint8_t matID, uint8_t colID, uint8_t mfgID);
-static void drawSendSelectScreen();
-static void performReadForSend();
-static bool sendPendingTagToSnapmaker(uint8_t toolHead);
-static bool requestSendTagToSnapmaker(uint8_t toolHead);
-static bool fetchSnapmakerFilamentSensor(uint8_t toolHead, bool& detected);
-static bool refreshSnapmakerToolHeadInfo();
 
 static const char* tagModeLabel();
 static void saveDefaultMode(TagMode mode);
@@ -1127,8 +1077,6 @@ static void clearOpenSpoolReadState();
 static void applyOpenSpoolReadState(const OpenSpoolReadData& data);
 static void applyOpenSpoolReadToDrafts(const OpenSpoolReadData& data);
 static bool openSpoolTempRangesValid(const char* minBuf, const char* maxBuf, const char* bedMinBuf, const char* bedMaxBuf, bool requireBed);
-static bool isUnsetOpenSpoolSubtype(const char* value);
-static void normalizeOpenSpoolSubtypeBuffer(char* value, size_t valueSize);
 
 static void loadManufacturers();
 static void resetManufacturersToDefault();
@@ -1143,15 +1091,13 @@ static void selectTouchSpi();
 static bool ensureSdAccess(bool forceRemount = false);
 static bool ensureSetupBackupDirectory();
 static bool saveSetupBackupToSd();
-static bool restoreSetupBackupFromSd(bool forceRestore = false);
+static bool restoreSetupBackupFromSd();
 static const char* listBackupPathForNs(const char* nsName);
 static bool saveListBackupToSd(const char* nsName, const void* data, size_t dataSize);
 static bool restoreListBackupToPrefs(const char* nsName, void* data, size_t dataSize);
 static void restoreAllListBackupsFromSd();
 static void saveAllListBackupsFromPrefs();
 static void saveListBlobToPrefs(const char* nsName, const void* data, size_t dataSize);
-static bool uiSettingsBlobExistsInPrefs();
-static bool listBlobExistsInPrefs(const char* nsName, size_t dataSize);
 static void initSdCard();
 static void refreshOfficialListAvailability();
 static bool shouldPollSdHotplug();
@@ -1178,9 +1124,6 @@ static void drawWifiDebugScreen();
 static const char* wifiAuthModeLabel(wifi_auth_mode_t mode);
 static void logWifiScanResults();
 static void logWifiDhcpInfo();
-static String snapmakerHostOnly();
-static uint16_t snapmakerPortValue();
-static bool connectSnapmakerClient(WiFiClient& client, const String& host, uint16_t port);
 static String colorHexFrom565(uint16_t c);
 static String normalizeHexColor(const char* s, bool withHash);
 static int findColorIndexByHex(const char* value);
@@ -1263,11 +1206,6 @@ static void safeCopy(char* dst, const char* src, size_t dstSize) {
 static String trimName18(const String& s) {
   if (s.length() <= 18) return s;
   return s.substring(0, 18);
-}
-
-static String trimName12(const String& s) {
-  if (s.length() <= 12) return s;
-  return s.substring(0, 12);
 }
 
 static String trimName40(const String& s) {
@@ -1641,7 +1579,7 @@ static void logWifiDhcpInfo() {
 }
 
 static uint8_t getSetupPageCount() {
-  return 7;
+  return 6;
 }
 
 static void normalizeSetupPage() {
@@ -1750,7 +1688,7 @@ static const char* screensaverModeLabel() {
 
 static void chooseScreensaverPosition() {
   tft.setTextDatum(TL_DATUM);
-  int textW = tft.textWidth(""K.9"", 4);
+  int textW = tft.textWidth("BoxRFID", 4);
   const int textH = 26;
   const int leftPad = 8;
   const int topPad = 8;
@@ -1767,7 +1705,7 @@ static void drawScreensaver() {
   tft.fillScreen(TFT_BLACK);
   tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
   tft.setTextDatum(TL_DATUM);
-  tft.drawString(""K.9"", screensaverTextX, screensaverTextY, 4);
+  tft.drawString("BoxRFID", screensaverTextX, screensaverTextY, 4);
 }
 
 static bool screensaverTagPresent() {
@@ -1861,146 +1799,21 @@ static const char* listBackupPathForNs(const char* nsName) {
   return nullptr;
 }
 
-static bool readListJsonFromPrefs(String& json) {
-  json = "";
-  size_t jsonLen = prefs.getStringLength(PREF_LIST_JSON);
-  if (jsonLen == 0) return false;
-  if (jsonLen > 4096) {
-    prefs.remove(PREF_LIST_JSON);
-    return false;
-  }
-
-  char* buf = (char*)malloc(jsonLen + 1);
-  if (!buf) return false;
-  memset(buf, 0, jsonLen + 1);
-  size_t got = prefs.getString(PREF_LIST_JSON, buf, jsonLen + 1);
-  if (got > 0) json = String(buf);
-  free(buf);
-  return json.length() > 0;
-}
-
 static bool loadListBlob(const char* nsName, void* data, size_t dataSize) {
-  if (!nsName || !data || dataSize == 0) return false;
-
   prefs.begin(nsName, true);
-  String json;
-  readListJsonFromPrefs(json);
   size_t blobLen = prefs.getBytesLength(PREF_LIST_BLOB);
   bool ok = false;
-
-  if (json.length() > 0) {
-    JsonDocument doc;
-    DeserializationError err = deserializeJson(doc, json);
-    if (!err) {
-      memset(data, 0, dataSize);
-      JsonArrayConst items = doc["items"].as<JsonArrayConst>();
-      if (items.isNull()) items = doc.as<JsonArrayConst>();
-      if (!items.isNull()) {
-        if (dataSize == sizeof(gMaterials)) {
-          RuntimeItem* dst = (RuntimeItem*)data;
-          for (JsonObjectConst item : items) {
-            uint8_t v = item["v"] | 0;
-            if (v < 1 || v > MAX_MATERIALS) continue;
-            dst[v].active = true;
-            safeCopy(dst[v].name, item["n"] | "", sizeof(dst[v].name));
-            dst[v].nozzleMin = item["nmin"] | 0;
-            dst[v].nozzleMax = item["nmax"] | 0;
-            dst[v].bedMin = item["bmin"] | 0;
-            dst[v].bedMax = item["bmax"] | 0;
-          }
-          ok = true;
-        } else if (dataSize == sizeof(gManufacturers)) {
-          RuntimeItem* dst = (RuntimeItem*)data;
-          for (JsonObjectConst item : items) {
-            uint8_t v = item["v"] | 0;
-            if (v > MAX_MANUFACTURERS) continue;
-            dst[v].active = true;
-            safeCopy(dst[v].name, item["n"] | "", sizeof(dst[v].name));
-          }
-          ok = true;
-        } else if (dataSize == sizeof(gVariants)) {
-          RuntimeItem* dst = (RuntimeItem*)data;
-          for (JsonObjectConst item : items) {
-            uint8_t v = item["v"] | 0;
-            if (v < 1 || v > MAX_VARIANTS) continue;
-            dst[v].active = true;
-            safeCopy(dst[v].name, item["n"] | "", sizeof(dst[v].name));
-          }
-          ok = true;
-        }
-      }
-    }
-  }
-
-  if (!ok && blobLen == dataSize) {
+  if (blobLen == dataSize) {
     ok = (prefs.getBytes(PREF_LIST_BLOB, data, dataSize) == dataSize);
   }
   prefs.end();
   return ok;
 }
 
-static bool uiSettingsBlobExistsInPrefs() {
-  prefs.begin(PREF_NS_UI, true);
-  bool exists = (prefs.getBytesLength(PREF_UI_BLOB) == sizeof(UiSettingsBlob));
-  prefs.end();
-  return exists;
-}
-
-static bool listBlobExistsInPrefs(const char* nsName, size_t dataSize) {
-  if (!nsName || dataSize == 0) return false;
-  prefs.begin(nsName, true);
-  bool exists = (prefs.getStringLength(PREF_LIST_JSON) > 0) || (prefs.getBytesLength(PREF_LIST_BLOB) == dataSize);
-  prefs.end();
-  return exists;
-}
-
 static void saveListBlobToPrefs(const char* nsName, const void* data, size_t dataSize) {
-  if (!nsName || !data || dataSize == 0) return;
-
-  JsonDocument doc;
-  JsonArray items = doc["items"].to<JsonArray>();
-
-  if (dataSize == sizeof(gMaterials)) {
-    const RuntimeItem* src = (const RuntimeItem*)data;
-    for (uint8_t i = 1; i <= MAX_MATERIALS; i++) {
-      if (!src[i].active) continue;
-      JsonObject item = items.add<JsonObject>();
-      item["v"] = i;
-      item["n"] = src[i].name;
-      item["nmin"] = src[i].nozzleMin;
-      item["nmax"] = src[i].nozzleMax;
-      item["bmin"] = src[i].bedMin;
-      item["bmax"] = src[i].bedMax;
-    }
-  } else if (dataSize == sizeof(gManufacturers)) {
-    const RuntimeItem* src = (const RuntimeItem*)data;
-    for (uint8_t i = 0; i <= MAX_MANUFACTURERS; i++) {
-      if (!src[i].active) continue;
-      JsonObject item = items.add<JsonObject>();
-      item["v"] = i;
-      item["n"] = src[i].name;
-    }
-  } else if (dataSize == sizeof(gVariants)) {
-    const RuntimeItem* src = (const RuntimeItem*)data;
-    for (uint8_t i = 1; i <= MAX_VARIANTS; i++) {
-      if (!src[i].active) continue;
-      JsonObject item = items.add<JsonObject>();
-      item["v"] = i;
-      item["n"] = src[i].name;
-    }
-  } else {
-    return;
-  }
-
-  String json;
-  serializeJson(doc, json);
   prefs.begin(nsName, false);
-  size_t written = prefs.putString(PREF_LIST_JSON, json);
-  if (written > 0) {
-    prefs.remove(PREF_LIST_BLOB);
-  } else {
-    prefs.putBytes(PREF_LIST_BLOB, data, dataSize);
-  }
+  prefs.clear();
+  prefs.putBytes(PREF_LIST_BLOB, data, dataSize);
   prefs.end();
 }
 
@@ -2229,35 +2042,6 @@ static uint8_t normalizeOpenSpoolColorIndex(int value) {
   return 0;
 }
 
-static bool isUnsetOpenSpoolSubtype(const char* value) {
-  String subtype = String(value ? value : "");
-  subtype.trim();
-  if (subtype.length() == 0) return true;
-  if (subtype.equalsIgnoreCase("None")) return true;
-  for (uint8_t i = 0; i < LANG_COUNT; i++) {
-    if (subtype.equalsIgnoreCase(TXT_NONE[i])) return true;
-  }
-  return false;
-}
-
-static void normalizeOpenSpoolSubtypeBuffer(char* value, size_t valueSize) {
-  if (!value || valueSize == 0) return;
-  if (isUnsetOpenSpoolSubtype(value)) {
-    value[0] = '\0';
-    return;
-  }
-  String subtype = String(value);
-  subtype.trim();
-  safeCopy(value, subtype.c_str(), valueSize);
-}
-
-static String normalizedOpenSpoolSubtypeString(const char* value) {
-  String subtype = String(value ? value : "");
-  subtype.trim();
-  if (isUnsetOpenSpoolSubtype(subtype.c_str())) return String("");
-  return subtype;
-}
-
 static void setOpenSpoolDraftDefaults(OpenSpoolDraft& draft, uint8_t manufacturerVal, uint8_t materialVal, int colorIdx, const char* colorOverride) {
   draft.selMfg = normalizeOpenSpoolManufacturerVal(manufacturerVal);
   draft.selMatVal = normalizeOpenSpoolMaterialVal(materialVal);
@@ -2315,10 +2099,7 @@ static void applyOpenSpoolReadState(const OpenSpoolReadData& data) {
   clearOpenSpoolReadState();
   if (data.hasBrand && data.brand[0]) openSpoolReadBrand = String(data.brand);
   if (data.hasMaterial && data.material[0]) openSpoolReadMaterial = String(data.material);
-  if (data.hasSubtype) {
-    safeCopy(openSpoolReadSubtype, data.subtype, sizeof(openSpoolReadSubtype));
-    normalizeOpenSpoolSubtypeBuffer(openSpoolReadSubtype, sizeof(openSpoolReadSubtype));
-  }
+  if (data.hasSubtype) safeCopy(openSpoolReadSubtype, data.subtype, sizeof(openSpoolReadSubtype));
   if (data.hasColorHex) safeCopy(openSpoolReadColorHex, data.colorHex, sizeof(openSpoolReadColorHex));
   if (data.hasAlpha) safeCopy(openSpoolReadAlpha, data.alpha, sizeof(openSpoolReadAlpha));
   if (data.hasMinTemp) safeCopy(openSpoolReadMinTemp, data.minTemp, sizeof(openSpoolReadMinTemp));
@@ -2355,10 +2136,7 @@ static void applyOpenSpoolReadToDraft(OpenSpoolDraft& draft, const OpenSpoolRead
 
   setOpenSpoolDraftDefaults(draft, nextMfg, nextMat, nextColorIdx, colorOverride);
 
-  if (data.hasSubtype) {
-    safeCopy(draft.osSubtype, data.subtype, sizeof(draft.osSubtype));
-    normalizeOpenSpoolSubtypeBuffer(draft.osSubtype, sizeof(draft.osSubtype));
-  }
+  if (data.hasSubtype) safeCopy(draft.osSubtype, data.subtype, sizeof(draft.osSubtype));
   if (data.hasAlpha) safeCopy(draft.osAlpha, data.alpha, sizeof(draft.osAlpha));
   if (data.hasMinTemp) safeCopy(draft.osMinTemp, data.minTemp, sizeof(draft.osMinTemp));
   if (data.hasMaxTemp) safeCopy(draft.osMaxTemp, data.maxTemp, sizeof(draft.osMaxTemp));
@@ -2413,7 +2191,6 @@ static void saveCurrentOpenSpoolDraft() {
   draft.selMatVal = selMatVal;
   draft.selColIdx = selColIdx;
   safeCopy(draft.osSubtype, osSubtype, sizeof(draft.osSubtype));
-  normalizeOpenSpoolSubtypeBuffer(draft.osSubtype, sizeof(draft.osSubtype));
   safeCopy(draft.osAlpha, osAlpha, sizeof(draft.osAlpha));
   safeCopy(draft.osMinTemp, osMinTemp, sizeof(draft.osMinTemp));
   safeCopy(draft.osMaxTemp, osMaxTemp, sizeof(draft.osMaxTemp));
@@ -2435,7 +2212,6 @@ static void loadOpenSpoolDraft(bool u1Mode) {
   selMatVal = normalizeOpenSpoolMaterialVal(draft.selMatVal);
   selColIdx = normalizeOpenSpoolColorIndex(draft.selColIdx);
   safeCopy(osSubtype, draft.osSubtype, sizeof(osSubtype));
-  normalizeOpenSpoolSubtypeBuffer(osSubtype, sizeof(osSubtype));
   safeCopy(osAlpha, draft.osAlpha, sizeof(osAlpha));
   safeCopy(osMinTemp, draft.osMinTemp, sizeof(osMinTemp));
   safeCopy(osMaxTemp, draft.osMaxTemp, sizeof(osMaxTemp));
@@ -2467,11 +2243,8 @@ static void initOpenSpoolDrafts() {
 }
 
 static uint16_t colorTextForBg(uint16_t bg) {
-  uint8_t r = ((bg >> 11) & 0x1F) * 255 / 31;
-  uint8_t g = ((bg >> 5) & 0x3F) * 255 / 63;
-  uint8_t b = (bg & 0x1F) * 255 / 31;
-  uint32_t luminance = (uint32_t)r * 299UL + (uint32_t)g * 587UL + (uint32_t)b * 114UL;
-  return (luminance >= 128000UL) ? TFT_BLACK : TFT_WHITE;
+  if (bg == TFT_BLACK || bg == TFT_BLUE || bg == TFT_RED || bg == 0x0011 || bg == 0x435C || bg == 0x801F || bg == 0x79E0 || bg == 0xA145) return TFT_WHITE;
+  return TFT_BLACK;
 }
 
 static void fillButton(int x, int y, int w, int h, uint16_t fill, uint16_t border, const String& txt, uint16_t txtColor = TFT_WHITE, int font = 2) {
@@ -2529,7 +2302,7 @@ static void drawMainMenuStatus() {
   tft.fillRect(0, TFT_H - UI_STATUS_H + 1, TFT_W, UI_STATUS_H - 1, TFT_BLACK);
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
   tft.setTextDatum(MC_DATUM);
-  tft.drawString("""K.9"" RFID Spool Manager — Built by Joe the Builder", TFT_W / 2, TFT_H - UI_STATUS_H / 2, 1);
+  tft.drawString("BoxRFID OpenSpool Edition by TinkerBarn", TFT_W / 2, TFT_H - UI_STATUS_H / 2, 1);
   tft.setTextDatum(TL_DATUM);
 }
 
@@ -2875,12 +2648,11 @@ static void resetVariantsToDefault() {
   }
   saveListBlob(currentVarPrefsNs(), gVariants, sizeof(gVariants));
 
-  normalizeOpenSpoolSubtypeBuffer(osSubtype, sizeof(osSubtype));
   bool subtypeFound = false;
   for (uint8_t i = 1; i <= MAX_VARIANTS; i++) {
     if (gVariants[i].active && strcmp(gVariants[i].name, osSubtype) == 0) { subtypeFound = true; break; }
   }
-  if (!subtypeFound && osSubtype[0] != '\0' && DEFAULT_OS_VARIANT_COUNT > 0) safeCopy(osSubtype, DEFAULT_OS_VARIANTS[0], sizeof(osSubtype));
+  if (!subtypeFound && DEFAULT_OS_VARIANT_COUNT > 0) safeCopy(osSubtype, DEFAULT_OS_VARIANTS[0], sizeof(osSubtype));
 }
 
 static void loadVariants() {
@@ -2893,12 +2665,11 @@ static void loadVariants() {
   bool anyStored = loadListBlob(currentVarPrefsNs(), gVariants, sizeof(gVariants));
   if (!anyStored) resetVariantsToDefault();
 
-  normalizeOpenSpoolSubtypeBuffer(osSubtype, sizeof(osSubtype));
   bool subtypeFound = false;
   for (uint8_t i = 1; i <= MAX_VARIANTS; i++) {
     if (gVariants[i].active && strcmp(gVariants[i].name, osSubtype) == 0) { subtypeFound = true; break; }
   }
-  if (!subtypeFound && osSubtype[0] != '\0') {
+  if (!subtypeFound) {
     for (uint8_t i = 1; i <= MAX_VARIANTS; i++) {
       if (gVariants[i].active) { safeCopy(osSubtype, gVariants[i].name, sizeof(osSubtype)); subtypeFound = true; break; }
     }
@@ -2962,7 +2733,7 @@ static void loadManufacturers() {
       repaired = true;
     }
   } else {
-    if (!gManufacturers[1].active || strlen(gManufacturers[1].name) == 0) {
+    if (!gManufacturers[1].active || strlen(gManufacturers[1].name) == 0 || strcmp(gManufacturers[1].name, "QIDI") == 0) {
       gManufacturers[1].active = true;
       safeCopy(gManufacturers[1].name, "Snapmaker", sizeof(gManufacturers[1].name));
       repaired = true;
@@ -3066,8 +2837,6 @@ static void saveWifiSettings() {
   prefs.putBool(PREF_WIFI_ENABLED, wifiEnabled);
   prefs.putString(PREF_WIFI_SSID, wifiSsid);
   prefs.putString(PREF_WIFI_PASS, wifiPassword);
-  prefs.putString(PREF_SNAP_HOST, snapmakerHost);
-  prefs.putString(PREF_SNAP_PORT, snapmakerPort);
   prefs.end();
 }
 
@@ -3082,15 +2851,11 @@ static void saveOfficialListFlags() {
 static void loadWirelessSettings() {
   prefs.begin(PREF_NS_WIFI, true);
   wifiEnabled = prefs.getBool(PREF_WIFI_ENABLED, false);
-  wifiSsid[0] = '\0';
-  wifiPassword[0] = '\0';
-  safeCopy(snapmakerHost, "192.168.1.10", sizeof(snapmakerHost));
-  safeCopy(snapmakerPort, "7125", sizeof(snapmakerPort));
-  prefs.getString(PREF_WIFI_SSID, wifiSsid, sizeof(wifiSsid));
-  prefs.getString(PREF_WIFI_PASS, wifiPassword, sizeof(wifiPassword));
-  prefs.getString(PREF_SNAP_HOST, snapmakerHost, sizeof(snapmakerHost));
-  prefs.getString(PREF_SNAP_PORT, snapmakerPort, sizeof(snapmakerPort));
+  String ssid = prefs.getString(PREF_WIFI_SSID, "");
+  String pass = prefs.getString(PREF_WIFI_PASS, "");
   prefs.end();
+  safeCopy(wifiSsid, ssid.c_str(), sizeof(wifiSsid));
+  safeCopy(wifiPassword, pass.c_str(), sizeof(wifiPassword));
 
   prefs.begin(PREF_NS_QIDI_CFG, true);
   useOfficialListPlus4 = prefs.getBool(PREF_QIDI_USE_CFG_P4, false);
@@ -3164,10 +2929,6 @@ static bool saveSetupBackupToSd() {
   wifi["ssid"] = wifiSsid;
   wifi["password"] = wifiPassword;
 
-  JsonObject snapmaker = settings["snapmaker"].to<JsonObject>();
-  snapmaker["host"] = snapmakerHost;
-  snapmaker["port"] = snapmakerPort;
-
   JsonObject qidiCfg = settings["qidi_cfg"].to<JsonObject>();
   qidiCfg["plus4_enabled"] = useOfficialListPlus4;
   qidiCfg["q2_enabled"] = useOfficialListQ2;
@@ -3187,12 +2948,8 @@ static bool saveSetupBackupToSd() {
   return ok;
 }
 
-static bool restoreSetupBackupFromSd(bool forceRestore) {
+static bool restoreSetupBackupFromSd() {
   if (!sdAvailable || !ensureSdAccess(false)) return false;
-  if (!forceRestore && uiSettingsBlobExistsInPrefs()) {
-    selectTouchSpi();
-    return false;
-  }
   if (!SD.exists(SETUP_BACKUP_PATH)) {
     selectTouchSpi();
     return false;
@@ -3258,12 +3015,6 @@ static bool restoreSetupBackupFromSd(bool forceRestore) {
     if (wifi["password"].is<const char*>()) safeCopy(wifiPassword, wifi["password"].as<const char*>(), sizeof(wifiPassword));
   }
 
-  JsonObjectConst snapmaker = settings["snapmaker"].as<JsonObjectConst>();
-  if (!snapmaker.isNull()) {
-    if (snapmaker["host"].is<const char*>()) safeCopy(snapmakerHost, snapmaker["host"].as<const char*>(), sizeof(snapmakerHost));
-    if (snapmaker["port"].is<const char*>()) safeCopy(snapmakerPort, snapmaker["port"].as<const char*>(), sizeof(snapmakerPort));
-  }
-
   JsonObjectConst qidiCfg = settings["qidi_cfg"].as<JsonObjectConst>();
   if (!qidiCfg.isNull()) {
     if (qidiCfg["plus4_enabled"].is<bool>()) useOfficialListPlus4 = qidiCfg["plus4_enabled"].as<bool>();
@@ -3282,23 +3033,23 @@ static bool restoreSetupBackupFromSd(bool forceRestore) {
 static void restoreAllListBackupsFromSd() {
   {
     RuntimeItem mats[MAX_MATERIALS + 1] = {};
-    if (!listBlobExistsInPrefs(PREF_NS_MAT_QIDI, sizeof(mats))) restoreListBackupToPrefs(PREF_NS_MAT_QIDI, mats, sizeof(mats));
-    if (!listBlobExistsInPrefs(PREF_NS_MAT_QIDI_Q2, sizeof(mats))) restoreListBackupToPrefs(PREF_NS_MAT_QIDI_Q2, mats, sizeof(mats));
-    if (!listBlobExistsInPrefs(PREF_NS_MAT_QIDI_M4, sizeof(mats))) restoreListBackupToPrefs(PREF_NS_MAT_QIDI_M4, mats, sizeof(mats));
-    if (!listBlobExistsInPrefs(PREF_NS_MAT_OS, sizeof(mats))) restoreListBackupToPrefs(PREF_NS_MAT_OS, mats, sizeof(mats));
+    restoreListBackupToPrefs(PREF_NS_MAT_QIDI, mats, sizeof(mats));
+    restoreListBackupToPrefs(PREF_NS_MAT_QIDI_Q2, mats, sizeof(mats));
+    restoreListBackupToPrefs(PREF_NS_MAT_QIDI_M4, mats, sizeof(mats));
+    restoreListBackupToPrefs(PREF_NS_MAT_OS, mats, sizeof(mats));
   }
 
   {
     RuntimeItem mfgs[MAX_MANUFACTURERS + 1] = {};
-    if (!listBlobExistsInPrefs(PREF_NS_MFG_QIDI, sizeof(mfgs))) restoreListBackupToPrefs(PREF_NS_MFG_QIDI, mfgs, sizeof(mfgs));
-    if (!listBlobExistsInPrefs(PREF_NS_MFG_QIDI_Q2, sizeof(mfgs))) restoreListBackupToPrefs(PREF_NS_MFG_QIDI_Q2, mfgs, sizeof(mfgs));
-    if (!listBlobExistsInPrefs(PREF_NS_MFG_QIDI_M4, sizeof(mfgs))) restoreListBackupToPrefs(PREF_NS_MFG_QIDI_M4, mfgs, sizeof(mfgs));
-    if (!listBlobExistsInPrefs(PREF_NS_MFG_OS, sizeof(mfgs))) restoreListBackupToPrefs(PREF_NS_MFG_OS, mfgs, sizeof(mfgs));
+    restoreListBackupToPrefs(PREF_NS_MFG_QIDI, mfgs, sizeof(mfgs));
+    restoreListBackupToPrefs(PREF_NS_MFG_QIDI_Q2, mfgs, sizeof(mfgs));
+    restoreListBackupToPrefs(PREF_NS_MFG_QIDI_M4, mfgs, sizeof(mfgs));
+    restoreListBackupToPrefs(PREF_NS_MFG_OS, mfgs, sizeof(mfgs));
   }
 
   {
     RuntimeItem vars[MAX_VARIANTS + 1] = {};
-    if (!listBlobExistsInPrefs(PREF_NS_VAR_OS, sizeof(vars))) restoreListBackupToPrefs(PREF_NS_VAR_OS, vars, sizeof(vars));
+    restoreListBackupToPrefs(PREF_NS_VAR_OS, vars, sizeof(vars));
   }
 }
 
@@ -4154,8 +3905,6 @@ static void clearLanguagePrefs() {
   wifiEnabled = false;
   wifiSsid[0] = '\0';
   wifiPassword[0] = '\0';
-  safeCopy(snapmakerHost, "192.168.1.10", sizeof(snapmakerHost));
-  safeCopy(snapmakerPort, "7125", sizeof(snapmakerPort));
   useOfficialListPlus4 = false;
   useOfficialListQ2 = false;
   useOfficialListMax4 = false;
@@ -4251,8 +4000,6 @@ static void factoryResetSettings() {
   wifiEnabled = false;
   wifiSsid[0] = '\0';
   wifiPassword[0] = '\0';
-  safeCopy(snapmakerHost, "192.168.1.10", sizeof(snapmakerHost));
-  safeCopy(snapmakerPort, "7125", sizeof(snapmakerPort));
   useOfficialListPlus4 = false;
   useOfficialListQ2 = false;
   useOfficialListMax4 = false;
@@ -4671,7 +4418,7 @@ static bool parseColor565FromHex(const char* s, uint16_t& out565) {
 static String openSpoolOrcaNamePreview() {
   String brand = manufacturerNameByVal(selMfg);
   String type = materialNameByVal(selMatVal);
-  String subtype = normalizedOpenSpoolSubtypeString(osSubtype);
+  String subtype = String(osSubtype);
   brand.trim(); type.trim(); subtype.trim();
   String s = brand;
   if (type.length()) { if (s.length()) s += " "; s += type; }
@@ -4906,7 +4653,6 @@ static bool openSpoolReadTagPresent(String& brand, String& material, String& sub
   if (doc["subtype"].is<String>()) {
     readData.hasSubtype = true;
     safeCopy(readData.subtype, ((const char*)doc["subtype"]), sizeof(readData.subtype));
-    normalizeOpenSpoolSubtypeBuffer(readData.subtype, sizeof(readData.subtype));
     subtype = String(readData.subtype);
   }
   if (doc["color_hex"].is<String>()) {
@@ -5052,8 +4798,7 @@ static void buildOpenSpoolDoc(JsonDocument& doc, OpenSpoolSaveTier tier) {
 
   if (openSpoolProfileU1 && tier >= OS_TIER_STANDARD) {
     int iv = 0;
-    normalizeOpenSpoolSubtypeBuffer(osSubtype, sizeof(osSubtype));
-    String subtype = normalizedOpenSpoolSubtypeString(osSubtype);
+    String subtype = String(osSubtype); subtype.trim();
     if (subtype.length()) doc["subtype"] = subtype;
     if (osInfoU1AlphaEnabled) {
       String alpha = normalizeAlphaHex(osAlpha);
@@ -5209,485 +4954,7 @@ static void drawTagInfoPopup(uint8_t matID, uint8_t colID, uint8_t mfgID) {
   tft.setTextDatum(TL_DATUM);
 }
 
-static int parseSendInt(const char* s, int fallback = -1) {
-  if (!s || !*s) return fallback;
-  String t = String(s);
-  t.trim();
-  if (!t.length()) return fallback;
-  return t.toInt();
-}
-
-static int parseRgbIntFromHex(const char* s) {
-  String x = normalizeHexColor(s, false);
-  if (x.length() != 6) return -1;
-  char* endptr = nullptr;
-  long v = strtol(x.c_str(), &endptr, 16);
-  if (!endptr || *endptr != 0 || v < 0 || v > 0xFFFFFF) return -1;
-  return (int)v;
-}
-
-static void clearSendTag() {
-  memset(&sendTag, 0, sizeof(sendTag));
-  sendTag.alpha = -1;
-  sendTag.minTemp = -1;
-  sendTag.maxTemp = -1;
-  sendTag.bedTemp = -1;
-}
-
-static void clearSnapmakerToolHeads(const char* statusText) {
-  memset(snapToolHeads, 0, sizeof(snapToolHeads));
-  snapToolHeadsKnown = false;
-  safeCopy(snapToolHeadStatus, statusText ? statusText : "", sizeof(snapToolHeadStatus));
-}
-
-static String rgbIntToHexString(int rgb) {
-  char buf[8];
-  snprintf(buf, sizeof(buf), "#%06X", (unsigned)(rgb & 0xFFFFFF));
-  return String(buf);
-}
-
-static bool skipHttpHeaders(WiFiClient& client, uint32_t timeoutMs) {
-  uint32_t start = millis();
-  while ((client.connected() || client.available()) && millis() - start < timeoutMs) {
-    String line = client.readStringUntil('\n');
-    start = millis();
-    if (line == "\r" || line.length() == 0) return true;
-  }
-  return false;
-}
-
-static bool isSnapmakerSendReady() {
-  return wifiEnabled && WiFi.status() == WL_CONNECTED && snapmakerHostOnly().length() > 0;
-}
-
-static void showSnapmakerSendSetupRequired(int nextState) {
-  showSimpleMessage(LTXT(TXT_SEND_TAG),
-                    LTXT(TXT_SEND_NEEDS_WIFI1),
-                    LTXT(TXT_SEND_NEEDS_WIFI2),
-                    "", "", nextState);
-}
-
-static void fillSendTagFromQidi(uint8_t matID, uint8_t colID, uint8_t mfgID, const uint8_t* uid, uint8_t uidLen) {
-  clearSendTag();
-  sendTag.valid = true;
-  safeCopy(sendTag.source, "QIDI", sizeof(sendTag.source));
-  safeCopy(sendTag.vendor, manufacturerNameByVal(mfgID).c_str(), sizeof(sendTag.vendor));
-  safeCopy(sendTag.mainType, materialNameByVal(matID).c_str(), sizeof(sendTag.mainType));
-  sendTag.subType[0] = '\0';
-  safeCopy(sendTag.colorHex, colorHexById(colID, true).c_str(), sizeof(sendTag.colorHex));
-  if (matID >= 1 && matID <= MAX_MATERIALS && gMaterials[matID].active) {
-    if (gMaterials[matID].nozzleMin > 0) sendTag.minTemp = gMaterials[matID].nozzleMin;
-    if (gMaterials[matID].nozzleMax > 0) sendTag.maxTemp = gMaterials[matID].nozzleMax;
-    if (gMaterials[matID].bedMax > 0) sendTag.bedTemp = gMaterials[matID].bedMax;
-    else if (gMaterials[matID].bedMin > 0) sendTag.bedTemp = gMaterials[matID].bedMin;
-  }
-  sendTag.uidLen = min<uint8_t>(uidLen, sizeof(sendTag.uid));
-  if (uid && sendTag.uidLen > 0) memcpy(sendTag.uid, uid, sendTag.uidLen);
-  else sendTag.uidLen = 0;
-}
-
-static void fillSendTagFromOpenSpool(const uint8_t* uid, uint8_t uidLen) {
-  clearSendTag();
-  sendTag.valid = true;
-  safeCopy(sendTag.source, "OpenSpool", sizeof(sendTag.source));
-  safeCopy(sendTag.vendor, openSpoolReadBrand.c_str(), sizeof(sendTag.vendor));
-  safeCopy(sendTag.mainType, openSpoolReadMaterial.c_str(), sizeof(sendTag.mainType));
-  safeCopy(sendTag.subType, openSpoolReadSubtype, sizeof(sendTag.subType));
-  safeCopy(sendTag.colorHex, openSpoolReadColorHex, sizeof(sendTag.colorHex));
-  uint8_t alpha = 0;
-  if (parseAlphaByte(openSpoolReadAlpha, alpha)) sendTag.alpha = alpha;
-  sendTag.minTemp = parseSendInt(openSpoolReadMinTemp);
-  sendTag.maxTemp = parseSendInt(openSpoolReadMaxTemp);
-  int bedMax = parseSendInt(openSpoolReadBedMaxTemp);
-  int bedMin = parseSendInt(openSpoolReadBedMinTemp);
-  sendTag.bedTemp = (bedMax >= 0) ? bedMax : bedMin;
-  sendTag.uidLen = min<uint8_t>(uidLen, sizeof(sendTag.uid));
-  if (uid && sendTag.uidLen > 0) memcpy(sendTag.uid, uid, sendTag.uidLen);
-  else sendTag.uidLen = 0;
-}
-
-static void fillSendTagFromOpenSpoolWriteSelection() {
-  clearSendTag();
-  sendTag.valid = true;
-  safeCopy(sendTag.source, "OpenSpool", sizeof(sendTag.source));
-  safeCopy(sendTag.vendor, manufacturerNameByVal(selMfg).c_str(), sizeof(sendTag.vendor));
-  safeCopy(sendTag.mainType, materialNameByVal(selMatVal).c_str(), sizeof(sendTag.mainType));
-
-  char subtype[ITEM_NAME_MAX + 1];
-  safeCopy(subtype, osSubtype, sizeof(subtype));
-  normalizeOpenSpoolSubtypeBuffer(subtype, sizeof(subtype));
-  safeCopy(sendTag.subType, subtype, sizeof(sendTag.subType));
-
-  safeCopy(sendTag.colorHex, normalizeHexColor(osColorHex, true).c_str(), sizeof(sendTag.colorHex));
-  uint8_t alpha = 0;
-  if (openSpoolProfileU1 && parseAlphaByte(osAlpha, alpha)) sendTag.alpha = alpha;
-  sendTag.minTemp = parseSendInt(osMinTemp);
-  sendTag.maxTemp = parseSendInt(osMaxTemp);
-  int bedMax = parseSendInt(osBedMaxTemp);
-  int bedMin = parseSendInt(osBedMinTemp);
-  sendTag.bedTemp = (bedMax >= 0) ? bedMax : bedMin;
-  sendTag.uidLen = 0;
-}
-
-static void fillSendTagFromCurrentWriteSelection() {
-  if (currentTagMode == TAGMODE_QIDI) {
-    fillSendTagFromQidi(selMatVal, COLORS[selColIdx].id, selMfg, nullptr, 0);
-    return;
-  }
-
-  normalizeOpenSpoolSubtypeBuffer(osSubtype, sizeof(osSubtype));
-  fillSendTagFromOpenSpoolWriteSelection();
-}
-
-static void openSendMenuFromCurrentWriteSelection(int returnState) {
-  if (!isSnapmakerSendReady()) {
-    showSnapmakerSendSetupRequired(returnState);
-    return;
-  }
-
-  if (currentTagMode == TAGMODE_OPENSPOOL) {
-    if (!osDraftsInitialized) initOpenSpoolDrafts();
-    saveCurrentOpenSpoolDraft();
-  }
-
-  fillSendTagFromCurrentWriteSelection();
-  sendFromWriteMode = true;
-  sendReturnState = (UIState)returnState;
-  refreshSnapmakerToolHeadInfo();
-  ui = UI_SEND_SELECT;
-  needRedraw = true;
-}
-
-static String snapmakerHostOnly() {
-  String host = String(snapmakerHost);
-  host.trim();
-  host.replace(" ", "");
-  if (host.startsWith("http://")) host = host.substring(7);
-  if (host.startsWith("https://")) host = host.substring(8);
-  int slash = host.indexOf('/');
-  if (slash >= 0) host = host.substring(0, slash);
-  int colon = host.indexOf(':');
-  if (colon >= 0) host = host.substring(0, colon);
-  return host;
-}
-
-static uint16_t snapmakerPortValue() {
-  String host = String(snapmakerHost);
-  host.trim();
-  host.replace(" ", "");
-  if (host.startsWith("http://")) host = host.substring(7);
-  if (host.startsWith("https://")) host = host.substring(8);
-  int slash = host.indexOf('/');
-  if (slash >= 0) host = host.substring(0, slash);
-  int colon = host.lastIndexOf(':');
-  if (colon > 0 && colon < (int)host.length() - 1) {
-    int urlPort = host.substring(colon + 1).toInt();
-    if (urlPort > 0 && urlPort <= 65535) return (uint16_t)urlPort;
-  }
-  int port = atoi(snapmakerPort);
-  if (port <= 0 || port > 65535) port = 7125;
-  return (uint16_t)port;
-}
-
-static bool connectSnapmakerClient(WiFiClient& client, const String& host, uint16_t port) {
-  if (client.connect(host.c_str(), port)) return true;
-  if (!host.endsWith(".local")) return false;
-
-  String mdnsName = host.substring(0, host.length() - 6);
-  IPAddress ip = MDNS.queryHost(mdnsName.c_str(), 2500);
-  if (ip == IPAddress(0, 0, 0, 0)) ip = MDNS.queryHost(host.c_str(), 2500);
-  if (ip == IPAddress(0, 0, 0, 0)) return false;
-  return client.connect(ip, port);
-}
-
-static bool refreshSnapmakerToolHeadInfo() {
-  clearSnapmakerToolHeads("");
-  if (!wifiEnabled) {
-    safeCopy(snapToolHeadStatus, "WLAN deaktiviert", sizeof(snapToolHeadStatus));
-    return false;
-  }
-  if (WiFi.status() != WL_CONNECTED || snapmakerHostOnly().length() == 0) {
-    safeCopy(snapToolHeadStatus, "U1 nicht erreichbar", sizeof(snapToolHeadStatus));
-    return false;
-  }
-
-  String host = snapmakerHostOnly();
-  uint16_t port = snapmakerPortValue();
-  WiFiClient client;
-  client.setTimeout(3000);
-  if (!connectSnapmakerClient(client, host, port)) {
-    safeCopy(snapToolHeadStatus, "U1 Status nicht erreichbar", sizeof(snapToolHeadStatus));
-    return false;
-  }
-
-  client.print(String("GET /printer/objects/query?filament_detect=info HTTP/1.1\r\nHost: ") + host + "\r\n");
-  client.print("Connection: close\r\n\r\n");
-
-  String status = client.readStringUntil('\n');
-  status.trim();
-  int httpCode = -1;
-  int sp = status.indexOf(' ');
-  if (sp >= 0 && status.length() >= sp + 4) httpCode = status.substring(sp + 1, sp + 4).toInt();
-
-  bool headersOk = skipHttpHeaders(client, 3000);
-  if (httpCode < 200 || httpCode >= 300 || !headersOk) {
-    client.stop();
-    safeCopy(snapToolHeadStatus, "U1 Status HTTP Fehler", sizeof(snapToolHeadStatus));
-    return false;
-  }
-
-  JsonDocument doc;
-  DeserializationError err = deserializeJson(doc, client);
-  client.stop();
-  if (err) {
-    safeCopy(snapToolHeadStatus, "U1 Status JSON Fehler", sizeof(snapToolHeadStatus));
-    return false;
-  }
-
-  JsonArray infoArr = doc["result"]["status"]["filament_detect"]["info"];
-  if (infoArr.isNull()) {
-    safeCopy(snapToolHeadStatus, "U1 Filamentinfo fehlt", sizeof(snapToolHeadStatus));
-    return false;
-  }
-
-  for (uint8_t i = 0; i < 4; i++) {
-    SnapmakerToolHeadState& th = snapToolHeads[i];
-    th.known = false;
-    th.empty = true;
-    th.material[0] = '\0';
-    th.subtype[0] = '\0';
-    th.colorHex[0] = '\0';
-
-    if (i >= infoArr.size()) continue;
-    JsonObject info = infoArr[i];
-    if (info.isNull()) continue;
-
-    th.known = true;
-    const char* mat = info["MAIN_TYPE"].is<const char*>() ? info["MAIN_TYPE"].as<const char*>() : "";
-    const char* sub = info["SUB_TYPE"].is<const char*>() ? info["SUB_TYPE"].as<const char*>() : "";
-    safeCopy(th.material, mat, sizeof(th.material));
-    safeCopy(th.subtype, sub, sizeof(th.subtype));
-    if (info["RGB_1"].is<int>() || info["RGB_1"].is<long>()) {
-      safeCopy(th.colorHex, rgbIntToHexString(info["RGB_1"].as<int>()).c_str(), sizeof(th.colorHex));
-    }
-    th.empty = (strlen(th.material) == 0);
-    if (th.empty) {
-      safeCopy(th.material, "Leer/Empty", sizeof(th.material));
-      th.colorHex[0] = '\0';
-    }
-  }
-
-  snapToolHeadsKnown = true;
-  safeCopy(snapToolHeadStatus, "U1 Status geladen", sizeof(snapToolHeadStatus));
-  return true;
-}
-
-static bool fetchSnapmakerFilamentSensor(uint8_t toolHead, bool& detected) {
-  detected = false;
-  if (toolHead < 1 || toolHead > 4) return false;
-  if (!wifiEnabled || WiFi.status() != WL_CONNECTED || snapmakerHostOnly().length() == 0) return false;
-
-  String host = snapmakerHostOnly();
-  uint16_t port = snapmakerPortValue();
-  WiFiClient client;
-  client.setTimeout(3000);
-  if (!connectSnapmakerClient(client, host, port)) return false;
-
-  String sensorKey = String("filament_motion_sensor e") + String(toolHead - 1) + "_filament";
-  String path = String("/printer/objects/query?filament_motion_sensor%20e") + String(toolHead - 1) + "_filament=filament_detected";
-  client.print(String("GET ") + path + " HTTP/1.1\r\nHost: " + host + "\r\n");
-  client.print("Connection: close\r\n\r\n");
-
-  String status = client.readStringUntil('\n');
-  status.trim();
-  int httpCode = -1;
-  int sp = status.indexOf(' ');
-  if (sp >= 0 && status.length() >= sp + 4) httpCode = status.substring(sp + 1, sp + 4).toInt();
-
-  bool headersOk = skipHttpHeaders(client, 3000);
-  if (httpCode < 200 || httpCode >= 300 || !headersOk) {
-    client.stop();
-    return false;
-  }
-
-  JsonDocument doc;
-  DeserializationError err = deserializeJson(doc, client);
-  client.stop();
-  if (err) return false;
-
-  JsonVariant sensor = doc["result"]["status"][sensorKey];
-  if (sensor.isNull() || !sensor["filament_detected"].is<bool>()) return false;
-  detected = sensor["filament_detected"].as<bool>();
-  return true;
-}
-
-static bool buildSnapmakerPayload(uint8_t toolHead, String& outPayload) {
-  if (!sendTag.valid || toolHead < 1 || toolHead > 4) return false;
-  JsonDocument req;
-  req["channel"] = (int)(toolHead - 1);
-  JsonObject info = req["info"].to<JsonObject>();
-  if (strlen(sendTag.vendor)) info["VENDOR"] = sendTag.vendor;
-  if (strlen(sendTag.mainType)) info["MAIN_TYPE"] = sendTag.mainType;
-  if (strlen(sendTag.subType)) info["SUB_TYPE"] = sendTag.subType;
-  int rgb = parseRgbIntFromHex(sendTag.colorHex);
-  if (rgb >= 0) info["RGB_1"] = rgb;
-  if (sendTag.alpha >= 0) info["ALPHA"] = sendTag.alpha;
-  if (sendTag.minTemp >= 0) info["HOTEND_MIN_TEMP"] = sendTag.minTemp;
-  if (sendTag.maxTemp >= 0) info["HOTEND_MAX_TEMP"] = sendTag.maxTemp;
-  if (sendTag.bedTemp >= 0) info["BED_TEMP"] = sendTag.bedTemp;
-  JsonArray uidArr = info["CARD_UID"].to<JsonArray>();
-  for (uint8_t i = 0; i < sendTag.uidLen; i++) uidArr.add((int)sendTag.uid[i]);
-  outPayload = "";
-  serializeJson(req, outPayload);
-  return true;
-}
-
-static bool sendPendingTagToSnapmaker(uint8_t toolHead) {
-  if (!sendTag.valid) return false;
-  if (!wifiEnabled || WiFi.status() != WL_CONNECTED || snapmakerHostOnly().length() == 0) {
-    showSimpleMessage("Snapmaker U1", "Wi-Fi/Printer nicht bereit", "Check Wi-Fi and target", "", "", UI_SEND_SELECT);
-    return false;
-  }
-
-  String payload;
-  if (!buildSnapmakerPayload(toolHead, payload)) return false;
-  String host = snapmakerHostOnly();
-  uint16_t port = snapmakerPortValue();
-  WiFiClient client;
-  client.setTimeout(3000);
-  if (!connectSnapmakerClient(client, host, port)) {
-    showSimpleMessage("Snapmaker U1", "Webhook start failed", "", "", "", UI_SEND_SELECT);
-    return false;
-  }
-
-  client.print(String("POST /printer/filament_detect/set HTTP/1.1\r\nHost: ") + host + "\r\n");
-  client.print("Content-Type: application/json\r\nConnection: close\r\nContent-Length: ");
-  client.print(payload.length());
-  client.print("\r\n\r\n");
-  client.print(payload);
-
-  int code = -1;
-  String status = client.readStringUntil('\n');
-  status.trim();
-  int sp = status.indexOf(' ');
-  if (sp >= 0 && status.length() >= sp + 4) code = status.substring(sp + 1, sp + 4).toInt();
-  String resp = "";
-  uint32_t start = millis();
-  while (client.connected() && millis() - start < 3000) {
-    while (client.available()) {
-      char c = (char)client.read();
-      if (resp.length() < 48) resp += c;
-      start = millis();
-    }
-    delay(1);
-  }
-  while (client.available() && resp.length() < 48) resp += (char)client.read();
-  client.stop();
-
-  if (code >= 200 && code < 300) {
-    char line[48];
-    snprintf(line, sizeof(line), "ToolHead %u updated", (unsigned)toolHead);
-    showSimpleMessage("Snapmaker U1", line, "Tag data sent", "OK aktualisiert Status", "", UI_SEND_SELECT);
-    return true;
-  }
-
-  char codeLine[40];
-  snprintf(codeLine, sizeof(codeLine), "HTTP %d", code);
-  showSimpleMessage("Snapmaker U1", "Send failed", codeLine, resp.substring(0, 32), "", UI_SEND_SELECT);
-  return false;
-}
-
-static bool requestSendTagToSnapmaker(uint8_t toolHead) {
-  if (!sendTag.valid || toolHead < 1 || toolHead > 4) return false;
-  drawStatus("Filament Sensor pruefen...", TFT_YELLOW);
-  bool filamentDetected = false;
-  if (!fetchSnapmakerFilamentSensor(toolHead, filamentDetected)) {
-    showSimpleMessage("Snapmaker U1", "Filament Sensor", "Status nicht lesbar", "Senden abgebrochen", "", UI_SEND_SELECT);
-    return false;
-  }
-  if (filamentDetected) {
-    pendingSendToolHead = toolHead;
-    ui = UI_SEND_OVERWRITE_CONFIRM;
-    needRedraw = true;
-    return false;
-  }
-  return sendPendingTagToSnapmaker(toolHead);
-}
-
 // ==================== Tag operations ====================
-static bool tryReadQidiSendTag(const uint8_t* uid, uint8_t uidLen) {
-  if (!uid || uidLen != 4) return false;
-  if (!authBlockWithDefaultKeyA((uint8_t*)uid, uidLen, DATA_BLOCK)) return false;
-
-  uint8_t data[16] = {0};
-  if (!readBlock(DATA_BLOCK, data)) return false;
-  fillSendTagFromQidi(data[0], data[1], data[2], uid, uidLen);
-  drawTagInfoPopup(data[0], data[1], data[2]);
-  return true;
-}
-
-static bool tryReadOpenSpoolSendTag(const uint8_t* uid, uint8_t uidLen) {
-  if (!uid || uidLen == 0) return false;
-  drawStatus(TXT_READING_TAG[uiLang], TFT_YELLOW);
-  delay(60);
-  String brand, material, subtype, colorHex;
-  if (!openSpoolReadTagPresent(brand, material, subtype, colorHex)) return false;
-  fillSendTagFromOpenSpool(uid, uidLen);
-  openSpoolReadPage = 0;
-  openSpoolPopupHoldUntil = millis() + 3000;
-  drawOpenSpoolPopupPage();
-  drawStatus(TXT_TAG_READ[uiLang], TFT_GREEN);
-  return true;
-}
-
-static void performReadForSend() {
-  if (!wifiEnabled || WiFi.status() != WL_CONNECTED || snapmakerHostOnly().length() == 0) {
-    showSimpleMessage("Snapmaker U1", "WLAN/Printer nicht bereit", "Senden nicht moeglich", "", "", UI_SEND_SELECT);
-    return;
-  }
-
-  clearSendTag();
-  drawStatus(TR(STR_WAIT_TAG), TFT_YELLOW);
-
-  NfcLock lock(2500);
-  if (!lock.locked) {
-    drawStatus(TR(STR_NFC_BUSY), TFT_RED);
-    delay(1200);
-    needRedraw = true;
-    return;
-  }
-
-  uint8_t uid[10] = {0};
-  uint8_t uidLen = 0;
-  if (!waitForTagUID(uid, uidLen, 3000)) {
-    drawStatus(TR(STR_NO_TAG), TFT_RED);
-    delay(1200);
-    needRedraw = true;
-    return;
-  }
-
-  bool tagRead = false;
-  if (uidLen == 4) {
-    tagRead = tryReadQidiSendTag(uid, uidLen);
-    if (!tagRead) tagRead = tryReadOpenSpoolSendTag(uid, uidLen);
-  } else {
-    tagRead = tryReadOpenSpoolSendTag(uid, uidLen);
-    if (!tagRead) tagRead = tryReadQidiSendTag(uid, uidLen);
-  }
-
-  if (!tagRead) {
-    drawStatus(TR(STR_READ_FAILED), TFT_RED);
-    delay(1200);
-    needRedraw = true;
-    return;
-  }
-
-  delay(3000);
-  refreshSnapmakerToolHeadInfo();
-  ui = UI_SEND_SELECT;
-  needRedraw = true;
-}
-
 static void performReadQidi() {
   drawStatus(TR(STR_WAIT_TAG), TFT_YELLOW);
 
@@ -6283,7 +5550,7 @@ static void drawMainScreen() {
   tft.fillScreen(TFT_BLACK);
   drawHeader(TR(STR_MAIN_TITLE));
 
-  fillButton(20, 50, 140, 50, TFT_DARKGREEN, TFT_WHITE, LTXT(TXT_SEND_TAG), TFT_WHITE, 2);
+  fillButton(20, 50, 140, 50, autoDetectEnabled ? TFT_DARKGREEN : TFT_DARKGREY, TFT_WHITE, TR(STR_READ_TAG), TFT_WHITE, 2);
   fillButton(160, 50, 140, 50, TFT_MAROON, TFT_WHITE, TR(STR_WRITE_TAG), TFT_WHITE, 2);
   fillButton(20, 110, 140, 50, TFT_DARKCYAN, TFT_WHITE, TR(STR_SETUP), TFT_WHITE, 2);
   fillButton(160, 110, 140, 50, (currentTagMode == TAGMODE_QIDI) ? TFT_DARKGREEN : TFT_NAVY, TFT_WHITE,
@@ -6299,111 +5566,21 @@ static void drawOpenSpoolReadDetailsPanel() {
 
 static void drawReadScreen() {
   tft.fillScreen(TFT_BLACK);
-  drawHeader(LTXT(TXT_SEND_TAG));
+  drawHeader(TR(STR_ACTION_READ));
   fillButton(10, 50, 100, 40, TFT_DARKGREY, TFT_WHITE, TR(STR_BACK), TFT_WHITE, 2);
+  fillButton(210, 50, 100, 40, TFT_DARKGREEN, TFT_WHITE, TR(STR_READ_TAG), TFT_WHITE, 2);
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
-
-  bool readyToSend = isSnapmakerSendReady();
-  if (readyToSend) {
-    fillButton(194, 50, 116, 40, TFT_DARKGREEN, TFT_WHITE, LTXT(TXT_SEND_TAG), TFT_WHITE, 2);
-  }
-
   if (currentTagMode == TAGMODE_OPENSPOOL && readOpenSpoolDetailsVisible) {
     drawOpenSpoolReadDetailsPanel();
     noteUserActivity();
   drawStatus(TXT_TAG_READ[uiLang], TFT_GREEN);
     return;
   }
-  tft.drawCentreString("Tag lesen und an", TFT_W / 2, 104, 2);
-  tft.drawCentreString("Snapmaker U1 senden", TFT_W / 2, 126, 2);
-  String modeLabel = "QIDI/OpenSpool Auto";
-  tft.drawCentreString(modeLabel, TFT_W / 2, 152, 2);
-  if (!readyToSend) {
-    tft.setTextColor(TFT_YELLOW, TFT_BLACK);
-    if (!wifiEnabled) tft.drawCentreString("WLAN ist deaktiviert", TFT_W / 2, 180, 2);
-    else if (WiFi.status() != WL_CONNECTED) tft.drawCentreString("WLAN nicht verbunden", TFT_W / 2, 180, 2);
-    else tft.drawCentreString("Snapmaker Host fehlt", TFT_W / 2, 180, 2);
-  }
+  tft.drawCentreString(TR(STR_READY_READ), TFT_W / 2, 112, 2);
+  String modeLabel = (currentTagMode == TAGMODE_QIDI) ? currentQidiModeText() : String(tagModeLabel());
+  tft.drawCentreString(modeLabel, TFT_W / 2, 138, 2);
   drawStatusBarFrame();
-  drawStatus(readyToSend ? "Bereit zum Senden" : "Senden nicht moeglich", readyToSend ? TFT_WHITE : TFT_YELLOW);
-}
-
-static void drawToolHeadSendButton(uint8_t idx, int x, int y, int w, int h) {
-  SnapmakerToolHeadState& th = snapToolHeads[idx];
-  uint16_t fill = TFT_NAVY;
-  if (snapToolHeadsKnown && th.known && !th.empty && strlen(th.colorHex)) {
-    parseColor565FromHex(th.colorHex, fill);
-  } else if (snapToolHeadsKnown && th.empty) {
-    fill = TFT_DARKGREY;
-  }
-  uint16_t textCol = colorTextForBg(fill);
-  tft.fillRoundRect(x, y, w, h, 5, fill);
-  tft.drawRoundRect(x, y, w, h, 5, TFT_WHITE);
-  tft.setTextColor(textCol, fill);
-  tft.setTextDatum(MC_DATUM);
-  tft.drawString(String("TH") + String(idx + 1), x + w / 2, y + 8, 2);
-  String mat = (snapToolHeadsKnown && th.known) ? String(th.material) : String("-");
-  String subtype = (snapToolHeadsKnown && th.known) ? normalizedOpenSpoolSubtypeString(th.subtype) : String("");
-  if (subtype.length()) {
-    tft.drawString(trimName12(mat), x + w / 2, y + 24, 1);
-    tft.drawString(trimName12(subtype), x + w / 2, y + 36, 1);
-  } else {
-    tft.drawString(trimName12(mat), x + w / 2, y + h - 12, 1);
-  }
-  tft.setTextDatum(TL_DATUM);
-}
-
-static void drawSendSelectScreen() {
-  tft.fillScreen(TFT_BLACK);
-  drawHeader(LTXT(TXT_SEND_TO_U1));
-
-  fillButton(8, 40, 84, 28, TFT_DARKGREY, TFT_WHITE, TR(STR_BACK), TFT_WHITE, 2);
-  bool readyToSend = isSnapmakerSendReady();
-  if (!sendFromWriteMode) {
-    fillButton(210, 40, 100, 28, readyToSend ? TFT_DARKGREEN : TFT_DARKGREY, TFT_WHITE, TR(STR_READ_TAG), TFT_WHITE, 2);
-  }
-
-  tft.setTextColor(TFT_WHITE, TFT_BLACK);
-  if (sendTag.valid) {
-    tft.drawString(String(sendTag.source) + " Tag", 16, 74, 2);
-    tft.drawString(trimName18(String(sendTag.vendor)), 16, 96, 2);
-    tft.drawString(trimName18(String(sendTag.mainType)), 16, 118, 2);
-    String subtype = normalizedOpenSpoolSubtypeString(sendTag.subType);
-    if (subtype.length()) {
-      tft.drawString(trimName18(subtype), 16, 138, 1);
-    }
-
-    uint16_t swatch = TFT_DARKGREY;
-    parseColor565FromHex(sendTag.colorHex, swatch);
-    tft.fillRoundRect(224, 78, 72, 34, 5, swatch);
-    tft.drawRoundRect(224, 78, 72, 34, 5, TFT_WHITE);
-    tft.setTextColor(colorTextForBg(swatch), swatch);
-    tft.setTextDatum(MC_DATUM);
-    tft.drawString(String(sendTag.colorHex), 260, 95, 1);
-    tft.setTextDatum(TL_DATUM);
-  } else {
-    tft.drawCentreString("Bitte Tag lesen", TFT_W / 2, 82, 2);
-    tft.drawCentreString("QIDI/OpenSpool Auto", TFT_W / 2, 106, 2);
-    if (!readyToSend) {
-      tft.setTextColor(TFT_YELLOW, TFT_BLACK);
-      if (!wifiEnabled) tft.drawCentreString("WLAN ist deaktiviert", TFT_W / 2, 126, 2);
-      else if (WiFi.status() != WL_CONNECTED) tft.drawCentreString("WLAN nicht verbunden", TFT_W / 2, 126, 2);
-      else tft.drawCentreString("Snapmaker Host fehlt", TFT_W / 2, 126, 2);
-    }
-  }
-
-  tft.setTextColor(TFT_YELLOW, TFT_BLACK);
-  tft.drawCentreString("ToolHead Ziel auswaehlen", TFT_W / 2, 136, 2);
-
-  drawToolHeadSendButton(0, 16, 158, 66, 44);
-  drawToolHeadSendButton(1, 92, 158, 66, 44);
-  drawToolHeadSendButton(2, 168, 158, 66, 44);
-  drawToolHeadSendButton(3, 244, 158, 66, 44);
-
-  drawStatusBarFrame();
-  if (!readyToSend) drawStatus("Senden nicht moeglich", TFT_YELLOW);
-  else if (!sendTag.valid) drawStatus("Tag lesen zum Senden", TFT_WHITE);
-  else drawStatus(strlen(snapToolHeadStatus) ? snapToolHeadStatus : "ToolHead waehlen", snapToolHeadsKnown ? TFT_WHITE : TFT_YELLOW);
+  drawStatus(modeLabel.c_str(), TFT_WHITE);
 }
 
 static void drawOpenSpoolColorFieldButton(int x, int y, int w, int h, const char* value) {
@@ -6542,9 +5719,8 @@ static void drawWriteScreen() {
   const int topH = 28;
 
   if (currentTagMode == TAGMODE_QIDI) {
-    fillButton(8, topY, 72, topH, TFT_DARKGREY, TFT_WHITE, TR(STR_BACK), TFT_WHITE, 2);
-    fillButton(88, topY, 82, topH, isSnapmakerSendReady() ? TFT_NAVY : TFT_DARKGREY, TFT_WHITE, LTXT(TXT_SEND_SHORT), TFT_WHITE, 2);
-    fillButton(178, topY, 134, topH, TFT_DARKGREEN, TFT_WHITE, TR(STR_WRITE_TAG), TFT_WHITE, 2);
+    fillButton(8, topY, 80, topH, TFT_DARKGREY, TFT_WHITE, TR(STR_BACK), TFT_WHITE, 2);
+    fillButton(TFT_W - 8 - 110, topY, 110, topH, TFT_DARKGREEN, TFT_WHITE, TR(STR_WRITE_TAG), TFT_WHITE, 2);
     const int labelX = 12;
     const int btnX = 122;
     const int btnW = TFT_W - btnX - 12;
@@ -6573,12 +5749,10 @@ static void drawWriteScreen() {
   const int navY = UI_HEADER_H + 3;
   const int navH = 28;
   const int backX = 8;
-  const int backW = 72;
-  const int sendX = 88;
-  const int sendW = 68;
-  const int writeW = 72;
+  const int backW = 80;
+  const int writeW = 92;
   const int writeX = TFT_W - 8 - writeW;
-  const int arrowW = 32;
+  const int arrowW = 42;
   const uint8_t osPages = getOpenSpoolWritePageCount();
   const uint8_t osDisplayPages = getOpenSpoolDisplayPageCount();
   if (openSpoolWritePage >= osPages) openSpoolWritePage = 0;
@@ -6586,13 +5760,14 @@ static void drawWriteScreen() {
 
   fillButton(backX, navY, backW, navH, TFT_DARKGREY, TFT_WHITE, TR(STR_BACK), TFT_WHITE, 2);
   if (openSpoolWritePage > 0) {
-    fillButton(sendX, navY, sendW, navH, isSnapmakerSendReady() ? TFT_NAVY : TFT_DARKGREY, TFT_WHITE, LTXT(TXT_SEND_SHORT), TFT_WHITE, 2);
     fillButton(writeX, navY, writeW, navH, TFT_DARKGREEN, TFT_WHITE, LTXT(TXT_WRITE), TFT_WHITE, 2);
     if (osDisplayPages > 1) {
-      const int leftX = 164;
-      const int rightX = 202;
+      const int leftX = 96;
+      const int rightX = writeX - arrowW - 8;
       fillButton(leftX, navY, arrowW, navH, TFT_DARKGREY, TFT_WHITE, "<", TFT_WHITE, 2);
       fillButton(rightX, navY, arrowW, navH, TFT_DARKGREY, TFT_WHITE, ">", TFT_WHITE, 2);
+      tft.setTextColor(TFT_WHITE, TFT_BLACK);
+      tft.drawCentreString(String(openSpoolWritePage) + "/" + String(osDisplayPages), (leftX + arrowW + rightX) / 2, navY + 6, 2);
     }
   }
 
@@ -6749,13 +5924,6 @@ static void drawSetupScreen() {
     fillButton(21, 178, 188, 32, WiFi.status() == WL_CONNECTED ? TFT_DARKCYAN : TFT_DARKGREY, TFT_WHITE, String(LTXT(TXT_WIFI_IP)) + " " + trimName18(String(wifiIp)), TFT_WHITE, 2);
     fillButton(217, 178, 82, 32, TFT_NAVY, TFT_WHITE, "Debug", TFT_WHITE, 2);
   } else if (setupPage == 4) {
-    tft.setTextColor(TFT_YELLOW, TFT_BLACK);
-    tft.drawCentreString("Snapmaker U1", TFT_W / 2, 76, 2);
-    fillButton(21, 106, 278, 32, TFT_NAVY, TFT_WHITE, String("Host/URL ") + trimName18(String(strlen(snapmakerHost) ? snapmakerHost : "-")), TFT_WHITE, 2);
-    fillButton(21, 142, 278, 32, TFT_NAVY, TFT_WHITE, String("Port ") + trimName18(String(strlen(snapmakerPort) ? snapmakerPort : "7125")), TFT_WHITE, 2);
-    fillButton(21, 178, 278, 28, WiFi.status() == WL_CONNECTED ? TFT_DARKGREEN : TFT_DARKGREY, TFT_WHITE,
-               WiFi.status() == WL_CONNECTED ? "Wi-Fi ready" : "Wi-Fi not connected", TFT_WHITE, 2);
-  } else if (setupPage == 5) {
     if (!sdAvailable) {
       fillButton(20, 92, 280, 34, TFT_MAROON, TFT_WHITE, (uiLang == LANG_DE) ? "Keine MicroSD Karte gefunden" : "No MicroSD card found", TFT_WHITE, 2);
       fillButton(20, 136, 280, 34, TFT_DARKGREY, TFT_WHITE, (uiLang == LANG_DE) ? "Bitte MicroSD einlegen" : "Please insert MicroSD", TFT_WHITE, 2);
@@ -7481,9 +6649,9 @@ static bool keyboardHandleTouch(int x, int y) {
     kbAllowExtendedAscii = false;
     ui = uiBeforeKeyboard;
     if (uiBeforeKeyboard == UI_COLOR_PICKER && cpHexEditActive) applyCpHexEdit();
-    if (uiBeforeKeyboard == UI_SETUP && (kbTargetBuffer == wifiSsid || kbTargetBuffer == wifiPassword || kbTargetBuffer == snapmakerHost || kbTargetBuffer == snapmakerPort)) {
+    if (uiBeforeKeyboard == UI_SETUP && (kbTargetBuffer == wifiSsid || kbTargetBuffer == wifiPassword)) {
       saveAllSetupPreferences();
-      if (kbTargetBuffer == wifiSsid || kbTargetBuffer == wifiPassword) applyWifiState(true);
+      applyWifiState(true);
     }
     needRedraw = true;
     return true;
@@ -7497,9 +6665,9 @@ static bool keyboardHandleTouch(int x, int y) {
     kbAllowExtendedAscii = false;
     ui = uiBeforeKeyboard;
     if (uiBeforeKeyboard == UI_COLOR_PICKER && cpHexEditActive) applyCpHexEdit();
-    if (uiBeforeKeyboard == UI_SETUP && (savedTarget == wifiSsid || savedTarget == wifiPassword || savedTarget == snapmakerHost || savedTarget == snapmakerPort)) {
+    if (uiBeforeKeyboard == UI_SETUP && (savedTarget == wifiSsid || savedTarget == wifiPassword)) {
       saveAllSetupPreferences();
-      if (savedTarget == wifiSsid || savedTarget == wifiPassword) applyWifiState(true);
+      applyWifiState(true);
     }
     // Validate nozzle/bed max temperature when OK is pressed
     if (uiBeforeKeyboard == UI_WRITE) {
@@ -7690,8 +6858,6 @@ static void uiRedrawIfNeeded() {
                                                      (uiLang == LANG_DE) ? "und Ordner neu anlegen?" : "and recreate folders?"); break;
     case UI_SD_CONTENT:         drawSdContentScreen(); break;
     case UI_WIFI_DEBUG:         drawWifiDebugScreen(); break;
-    case UI_SEND_SELECT:        drawSendSelectScreen(); break;
-    case UI_SEND_OVERWRITE_CONFIRM: drawConfirmScreen("Snapmaker U1", "Filament erkannt", "ToolHead wirklich", "ueberschreiben?"); break;
 
     case UI_MESSAGE_OK:         drawMessageOkScreen(); break;
     case UI_KEYBOARD:           drawKeyboardScreen(); break;
@@ -7711,11 +6877,6 @@ static void uiHandleTouch(int x, int y) {
 
   if (ui == UI_MESSAGE_OK) {
     if (hit(110, 176, 100, 28, x, y)) {
-      if (messageOkNextState == UI_SEND_SELECT && sendTag.valid) {
-        drawStatus("U1 Status aktualisieren...", TFT_YELLOW);
-        delay(250);
-        refreshSnapmakerToolHeadInfo();
-      }
       ui = messageOkNextState;
       needRedraw = true;
     }
@@ -7752,20 +6913,7 @@ static void uiHandleTouch(int x, int y) {
   }
 
   if (ui == UI_MAIN) {
-    if (hit(20, 50, 140, 50, x, y))  {
-      readOpenSpoolDetailsVisible = false;
-      readPopupVisible = false;
-      readResultPending = false;
-      readPopupMisses = 0;
-      autoPanelVisible = false;
-      sendFromWriteMode = false;
-      sendReturnState = UI_MAIN;
-      if (isSnapmakerSendReady()) refreshSnapmakerToolHeadInfo();
-      else clearSnapmakerToolHeads(!wifiEnabled ? "WLAN deaktiviert" : "U1 nicht erreichbar");
-      ui = UI_SEND_SELECT;
-      needRedraw = true;
-      return;
-    }
+    if (hit(20, 50, 140, 50, x, y))  { autoDetectEnabled = !autoDetectEnabled; saveAllSetupPreferences(); readOpenSpoolDetailsVisible = false; readPopupVisible = false; readResultPending = false; readPopupMisses = 0; autoPanelVisible = false; needRedraw = true; return; }
     if (hit(160, 50, 140, 50, x, y)) { syncOpenSpoolColorFromSelection(); if (currentTagMode == TAGMODE_OPENSPOOL) openSpoolWritePage = 0; ui = UI_WRITE; needRedraw = true; return; }
     if (hit(20, 110, 140, 50, x, y)) { setupPage = 0; normalizeSetupPage(); ui = UI_SETUP; needRedraw = true; return; }
     if (hit(160, 110, 140, 50, x, y)) { currentTagMode = (currentTagMode == TAGMODE_QIDI) ? TAGMODE_OPENSPOOL : TAGMODE_QIDI; defaultTagMode = currentTagMode; saveAllSetupPreferences(); normalizeSetupPage(); reloadModeDatabases(); if (currentTagMode == TAGMODE_OPENSPOOL) { if (!osDraftsInitialized) initOpenSpoolDrafts(); loadOpenSpoolDraft(openSpoolProfileU1); } syncOpenSpoolColorFromSelection(); readOpenSpoolDetailsVisible = false; readPopupVisible = false; readResultPending = false; readPopupMisses = 0; autoPanelVisible = false; autoLastMat = autoLastCol = autoLastMfg = 0xFF; autoLastOsUidLen = 0; memset(autoLastOsUid, 0, sizeof(autoLastOsUid)); needRedraw = true; return; }
@@ -7816,7 +6964,7 @@ static void uiHandleTouch(int x, int y) {
         if (hit(228, rows[i].y, 72, 32, x, y)) {
           if (isOfficialListAvailable(rows[i].model)) {
             officialListEnabledRef(rows[i].model) = !officialListEnabledRef(rows[i].model);
-            saveAllSetupPreferences();
+            saveOfficialListFlags();
             reloadModeDatabases();
           } else {
             showQidiCfgInfo(rows[i].model);
@@ -7852,9 +7000,6 @@ static void uiHandleTouch(int x, int y) {
       }
       if (hit(217, 178, 82, 32, x, y)) { ui = UI_WIFI_DEBUG; needRedraw = true; return; }
     } else if (setupPage == 4) {
-      if (hit(21, 106, 278, 32, x, y)) { openKeyboardForBufferExtended(snapmakerHost, sizeof(snapmakerHost) - 1, UI_SETUP); return; }
-      if (hit(21, 142, 278, 32, x, y)) { openKeyboardForBufferNumeric(snapmakerPort, sizeof(snapmakerPort) - 1, UI_SETUP); return; }
-    } else if (setupPage == 5) {
       if (!sdAvailable) return;
       if (hit(36, 84, 248, 34, x, y)) {
         buildSdContentList();
@@ -7925,59 +7070,14 @@ static void uiHandleTouch(int x, int y) {
 
   if (ui == UI_READ) {
     if (hit(10, 50, 100, 40, x, y))  { ui = UI_MAIN; needRedraw = true; return; }
-    if (isSnapmakerSendReady() &&
-        hit(194, 50, 116, 40, x, y)) { performReadForSend(); return; }
-    return;
-  }
-
-  if (ui == UI_SEND_SELECT) {
-    if (hit(8, 40, 84, 28, x, y)) {
-      UIState target = sendReturnState;
-      bool wasWriteMode = sendFromWriteMode;
-      clearSendTag();
-      sendFromWriteMode = false;
-      sendReturnState = UI_MAIN;
-      ui = wasWriteMode ? target : UI_MAIN;
-      needRedraw = true;
-      return;
-    }
-    if (!sendFromWriteMode && isSnapmakerSendReady() &&
-        hit(210, 40, 100, 28, x, y)) { performReadForSend(); return; }
-    if (!sendTag.valid && (hit(16, 158, 66, 44, x, y) || hit(92, 158, 66, 44, x, y) ||
-                           hit(168, 158, 66, 44, x, y) || hit(244, 158, 66, 44, x, y))) {
-      if (!isSnapmakerSendReady()) showSnapmakerSendSetupRequired(UI_SEND_SELECT);
-      else showSimpleMessage(LTXT(TXT_SEND_TAG), "Bitte zuerst", "einen Tag lesen", "", "", UI_SEND_SELECT);
-      return;
-    }
-    if (hit(16, 158, 66, 44, x, y)) { requestSendTagToSnapmaker(1); return; }
-    if (hit(92, 158, 66, 44, x, y)) { requestSendTagToSnapmaker(2); return; }
-    if (hit(168, 158, 66, 44, x, y)) { requestSendTagToSnapmaker(3); return; }
-    if (hit(244, 158, 66, 44, x, y)) { requestSendTagToSnapmaker(4); return; }
-    return;
-  }
-
-  if (ui == UI_SEND_OVERWRITE_CONFIRM) {
-    if (hit(45, 160, 90, 34, x, y)) {
-      uint8_t target = pendingSendToolHead;
-      pendingSendToolHead = 0;
-      ui = UI_SEND_SELECT;
-      if (target >= 1 && target <= 4) sendPendingTagToSnapmaker(target);
-      needRedraw = true;
-      return;
-    }
-    if (hit(185, 160, 90, 34, x, y)) {
-      pendingSendToolHead = 0;
-      ui = UI_SEND_SELECT;
-      needRedraw = true;
-      return;
-    }
+    if (hit(210, 50, 100, 40, x, y)) { ui = UI_MAIN; needRedraw = true; return; }
     return;
   }
 
   if (ui == UI_WRITE) {
     const int topY = UI_HEADER_H + 3;
     if (currentTagMode == TAGMODE_OPENSPOOL) {
-      if (hit(8, topY, 72, 28, x, y)) {
+      if (hit(8, topY, 80, 28, x, y)) {
         if (!osDraftsInitialized) initOpenSpoolDrafts();
         saveCurrentOpenSpoolDraft();
         if (openSpoolWritePage == 0) ui = UI_MAIN;
@@ -7986,30 +7086,20 @@ static void uiHandleTouch(int x, int y) {
         return;
       }
     } else {
-      if (hit(8, topY, 72, 28, x, y)) { ui = UI_MAIN; needRedraw = true; return; }
+      if (hit(8, topY, 80, 28, x, y)) { ui = UI_MAIN; needRedraw = true; return; }
     }
     uint8_t osPages = getOpenSpoolWritePageCount();
     uint8_t osDisplayPages = getOpenSpoolDisplayPageCount();
     OpenSpoolWritePageKind pageKind = getOpenSpoolWritePageKind(openSpoolWritePage);
 
-    if (currentTagMode == TAGMODE_QIDI && hit(88, topY, 82, 28, x, y)) {
-      openSendMenuFromCurrentWriteSelection(UI_WRITE);
-      return;
-    }
-    if (currentTagMode == TAGMODE_OPENSPOOL && openSpoolWritePage > 0 && hit(88, topY, 68, 28, x, y)) {
-      openSendMenuFromCurrentWriteSelection(UI_WRITE);
-      return;
-    }
-
     // Check nav arrows BEFORE write button to avoid touch-area overlap
     if (osDisplayPages > 1 && openSpoolWritePage > 0) {
       const int navY2 = UI_HEADER_H + 3; // = 35
-      if (hit(164, navY2, 32, 28, x, y)) { openSpoolWritePage = (openSpoolWritePage + osPages - 1) % osPages; if (openSpoolWritePage == 0) openSpoolWritePage = osPages - 1; needRedraw = true; return; }
-      if (hit(202, navY2, 32, 28, x, y)) { openSpoolWritePage = (openSpoolWritePage + 1) % osPages; if (openSpoolWritePage == 0) openSpoolWritePage = 1; needRedraw = true; return; }
+      if (hit(96, navY2, 42, 28, x, y)) { openSpoolWritePage = (openSpoolWritePage + osPages - 1) % osPages; if (openSpoolWritePage == 0) openSpoolWritePage = osPages - 1; needRedraw = true; return; }
+      if (hit(170, navY2, 42, 28, x, y)) { openSpoolWritePage = (openSpoolWritePage + 1) % osPages; if (openSpoolWritePage == 0) openSpoolWritePage = 1; needRedraw = true; return; }
     }
 
-    if (currentTagMode == TAGMODE_QIDI && hit(178, topY, 134, 28, x, y)) { performWrite(); return; }
-    if (currentTagMode == TAGMODE_OPENSPOOL && openSpoolWritePage > 0 && hit(TFT_W - 80, topY, 72, 28, x, y)) { performWrite(); return; }
+    if (!(currentTagMode == TAGMODE_OPENSPOOL && openSpoolWritePage == 0) && hit(TFT_W - 118, topY, 110, 28, x, y)) { performWrite(); return; }
 
     if (currentTagMode == TAGMODE_QIDI) {
       const int btnX = 122;
@@ -8263,7 +7353,6 @@ static void uiHandleTouch(int x, int y) {
         if (hit(x0 + c*(w+gapX), y0 + r*(h+gapY), w, h, x, y)) {
           if (idx == 0) osSubtype[0] = '\0';
           else safeCopy(osSubtype, variantNameByVal(getActiveVariantByIndex(idx - 1)).c_str(), sizeof(osSubtype));
-          normalizeOpenSpoolSubtypeBuffer(osSubtype, sizeof(osSubtype));
           ui = UI_WRITE;
           needRedraw = true;
           return;
@@ -8822,14 +7911,13 @@ void setup() {
   WiFi.setAutoReconnect(false);
   WiFi.mode(WIFI_OFF);
 
-  bool hadUiSettingsAtBoot = uiSettingsBlobExistsInPrefs();
   loadLanguage();
   addWifiDebugLine("Wi-Fi ready");
   loadCalibration();
   pinMode(XPT2046_CS, OUTPUT);
   digitalWrite(XPT2046_CS, HIGH);
   initSdCard();
-  restoreSetupBackupFromSd(!hadUiSettingsAtBoot);
+  restoreSetupBackupFromSd();
   restoreAllListBackupsFromSd();
   saveAllListBackupsFromPrefs();
   loadMaterials();
