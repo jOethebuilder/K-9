@@ -1,7 +1,7 @@
 /*
-  K.9 UI - ESP32-2432S028R (DIYMalls / CYD) + PN532 I2C
+  ""K.9"" UI - ESP32-2432S028R (DIYMalls / CYD) + PN532 I2C
   ===========================================================================
-  Version: K.9 v1.0
+  Version: ""K.9"" v1.0
 
   Hardware:
     - ESP32-2432S028R (CYD 2.8" Resistive Touch, DIYmalls.com)
@@ -201,7 +201,7 @@ static const int UI_HEADER_H = 32;
 static const int UI_STATUS_H = 24;
 
 static const char* APP_VERSION = "V4.2.1";
-static const char* WIFI_HOSTNAME = "boxrfid";
+static const char* WIFI_HOSTNAME = ""K.9"";
 
 static const int BL_PWM_FREQ = 5000;
 static const int BL_PWM_RES = 8;
@@ -495,7 +495,7 @@ enum UiStrId : uint16_t {
 
 static const char* const UI_STR[LANG_COUNT][STR_COUNT] = {
   {
-    "BoxRFID - Hauptmenue","Tag Lesen","Tag Schreiben","Auto: AN","Auto: AUS","Bereit zum Lesen",
+    "K.9 RFID Spool Manager,"Tag Lesen","Tag Schreiben","Auto: AN","Auto: AUS","Bereit zum Lesen",
     "Konfiguration","Material auswaehlen","Farbe auswaehlen","Warte auf Tag...","NFC beschaeftigt!","Kein Tag gefunden","Auth fehlgeschlagen!",
     "Lesen fehlgeschlagen!","Lesen: Tag erkannt","Schreiben fehlgeschlagen!","Schreiben erfolgreich!","Auto: Tag erkannt","Zurueck",
     "Tag Informationen","Hersteller","Material","Farbe","FEHLER: PN532 nicht gefunden!","Lesen","Schreiben","Einstellungen","Sprache","Sprache waehlen",
@@ -504,7 +504,7 @@ static const char* const UI_STR[LANG_COUNT][STR_COUNT] = {
     "Dunkelblau","Lavendel","Lime","Royalblau","Himmelblau","Violett","Rosa","Rot","Beige","Silber","Braun","Khaki","Orange","Bronze"
   },
   {
-    "BoxRFID - Main Menu","Read Tag","Write Tag","Auto: ON","Auto: OFF","Ready to read",
+    "K.9 RFID Spool Manager","Read Tag","Write Tag","Auto: ON","Auto: OFF","Ready to read",
     "Configure","Select material","Select color","Waiting for tag...","NFC busy!","No tag found","Auth failed!",
     "Read failed!","Read: tag detected","Write failed!","Write successful!","Auto: tag detected","Back",
     "Tag information","Manufacturer","Material","Color","ERROR: PN532 not found!","Read","Write","Settings","Language","Select language",
@@ -513,7 +513,7 @@ static const char* const UI_STR[LANG_COUNT][STR_COUNT] = {
     "Dark Blue","Lavender","Lime","Royal Blue","Sky Blue","Violet","Rose","Red","Beige","Silver","Brown","Khaki","Orange","Bronze"
   },
   {
-    "BoxRFID - Menu","Leer Tag","Escribir Tag","Auto: ON","Auto: OFF","Listo para leer",
+    "K.9  RFID Spool Manager","Leer Tag","Escribir Tag","Auto: ON","Auto: OFF","Listo para leer",
     "Configurar","Elegir material","Elegir color","Esperando tag...","NFC ocupado!","No se encontro tag","Fallo de auth!",
     "Fallo de lectura!","Leido: tag detectado","Fallo de escritura!","Escritura OK!","Auto: tag detectado","Atras",
     "Info del tag","Fabricante","Material","Color","ERROR: PN532 no encontrado!","Leer","Escribir","Ajustes","Idioma","Elegir idioma",
@@ -522,7 +522,7 @@ static const char* const UI_STR[LANG_COUNT][STR_COUNT] = {
     "Azul oscuro","Lavanda","Lima","Azul rey","Azul cielo","Violeta","Rosado","Rojo","Beige","Plata","Marron","Caqui","Naranja","Bronce"
   },
   {
-    "BoxRFID - Menu","Ler Tag","Escrever Tag","Auto: ON","Auto: OFF","Pronto para ler",
+    "K.9 RFID Spool Manager","Ler Tag","Escrever Tag","Auto: ON","Auto: OFF","Pronto para ler",
     "Configurar","Escolher material","Escolher cor","Aguardando tag...","NFC ocupado!","Nenhum tag","Falha de auth!",
     "Falha na leitura!","Leitura: tag detectado","Falha na escrita!","Escrita OK!","Auto: tag detectado","Voltar",
     "Info do tag","Fabricante","Material","Cor","ERRO: PN532 nao encontrado!","Ler","Escrever","Definicoes","Idioma","Selecionar idioma",
@@ -531,7 +531,7 @@ static const char* const UI_STR[LANG_COUNT][STR_COUNT] = {
     "Azul escuro","Lavanda","Lima","Azul royal","Azul ceu","Violeta","Rose","Vermelho","Bege","Prata","Marrom","Caqui","Laranja","Bronze"
   },
   {
-    "BoxRFID - Menu","Lire Tag","Ecrire Tag","Auto: ON","Auto: OFF","Pret a lire",
+    "K.9 RFID Spool Manager","Lire Tag","Ecrire Tag","Auto: ON","Auto: OFF","Pret a lire",
     "Configurer","Choisir mat.","Choisir couleur","Attente du tag...","NFC occupe!","Aucun tag","Auth echouee!",
     "Lecture echouee!","Lu: tag detecte","Ecriture echouee!","Ecriture OK!","Auto: tag detecte","Retour",
     "Info du tag","Fabricant","Materiau","Couleur","ERREUR: PN532 introuvable!","Lire","Ecrire","Reglages","Langue","Choisir langue",
@@ -540,7 +540,7 @@ static const char* const UI_STR[LANG_COUNT][STR_COUNT] = {
     "Bleu fonce","Lavande","Citron vert","Bleu royal","Bleu ciel","Violet","Rose","Rouge","Beige","Argent","Marron","Kaki","Orange","Bronze"
   },
   {
-    "BoxRFID - Menu principale","Leggi tag","Scrivi tag","Auto: ON","Auto: OFF","Pronto per leggere",
+    "K.9 RFID Spool Manager principale","Leggi tag","Scrivi tag","Auto: ON","Auto: OFF","Pronto per leggere",
     "Configura","Seleziona materiale","Seleziona colore","In attesa del tag...","NFC occupato!","Nessun tag trovato","Auth fallita!",
     "Lettura fallita!","Lettura: tag rilevato","Scrittura fallita!","Scrittura riuscita!","Auto: tag rilevato","Indietro",
     "Informazioni tag","Produttore","Materiale","Colore","ERRORE: PN532 non trovato!","Leggi","Scrivi","Impostazioni","Lingua","Seleziona lingua",
@@ -1750,7 +1750,7 @@ static const char* screensaverModeLabel() {
 
 static void chooseScreensaverPosition() {
   tft.setTextDatum(TL_DATUM);
-  int textW = tft.textWidth("BoxRFID", 4);
+  int textW = tft.textWidth(""K.9"", 4);
   const int textH = 26;
   const int leftPad = 8;
   const int topPad = 8;
@@ -1767,7 +1767,7 @@ static void drawScreensaver() {
   tft.fillScreen(TFT_BLACK);
   tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
   tft.setTextDatum(TL_DATUM);
-  tft.drawString("BoxRFID", screensaverTextX, screensaverTextY, 4);
+  tft.drawString(""K.9"", screensaverTextX, screensaverTextY, 4);
 }
 
 static bool screensaverTagPresent() {
@@ -2529,7 +2529,7 @@ static void drawMainMenuStatus() {
   tft.fillRect(0, TFT_H - UI_STATUS_H + 1, TFT_W, UI_STATUS_H - 1, TFT_BLACK);
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
   tft.setTextDatum(MC_DATUM);
-  tft.drawString("K.9 RFID Spool Manager — Built by Joe the Builder", TFT_W / 2, TFT_H - UI_STATUS_H / 2, 1);
+  tft.drawString("""K.9"" RFID Spool Manager — Built by Joe the Builder", TFT_W / 2, TFT_H - UI_STATUS_H / 2, 1);
   tft.setTextDatum(TL_DATUM);
 }
 
