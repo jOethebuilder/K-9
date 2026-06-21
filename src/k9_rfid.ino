@@ -1,7 +1,7 @@
 /*
-  BoxRFID Touch UI - ESP32-2432S028R (DIYMalls / CYD) + PN532 I2C
+  K.9 RFID Spool Management - ESP32-2432S028R (DIYMalls / CYD) + PN532 I2C
   ===========================================================================
-  Version: V4.1
+  Version: K.9 v1.0
 
   Hardware:
     - ESP32-2432S028R (CYD 2.8" Resistive Touch, DIYmalls.com)
@@ -197,8 +197,8 @@ static int TFT_H = 240;
 static const int UI_HEADER_H = 32;
 static const int UI_STATUS_H = 24;
 
-static const char* APP_VERSION = "V4.1";
-static const char* WIFI_HOSTNAME = "boxrfid";
+static const char* APP_VERSION = "K.9 v1.0";
+static const char* WIFI_HOSTNAME = "k9rfid";
 
 static const int BL_PWM_FREQ = 5000;
 static const int BL_PWM_RES = 8;
@@ -236,9 +236,9 @@ static const uint8_t MAX_MATERIALS = 128;
 static const uint8_t MAX_MANUFACTURERS = 64;
 static const uint8_t MAX_VARIANTS = 24;
 
-static const char* BOXRFID_SD_DIR = "/boxrfid";
-static const char* BOXRFID_LIST_DIR = "/boxrfid/lists";
-static const char* SETUP_BACKUP_PATH = "/boxrfid/setup_backup.json";
+static const char* BOXRFID_SD_DIR = "/k9rfid";
+static const char* BOXRFID_LIST_DIR = "/k9rfid/lists";
+static const char* SETUP_BACKUP_PATH = "/k9rfid/setup_backup.json";
 static const uint8_t SETUP_BACKUP_SCHEMA_VERSION = 1;
 static const char* OFFICIAL_CFG_DIR = "/qidi";
 static const char* OFFICIAL_CFG_DIR_PLUS4 = "/qidi/plus4";
@@ -492,7 +492,7 @@ enum UiStrId : uint16_t {
 
 static const char* const UI_STR[LANG_COUNT][STR_COUNT] = {
   {
-    "BoxRFID - Hauptmenue","Tag Lesen","Tag Schreiben","Auto: AN","Auto: AUS","Bereit zum Lesen",
+    "k9rfid - Hauptmenue","Tag Lesen","Tag Schreiben","Auto: AN","Auto: AUS","Bereit zum Lesen",
     "Konfiguration","Material auswaehlen","Farbe auswaehlen","Warte auf Tag...","NFC beschaeftigt!","Kein Tag gefunden","Auth fehlgeschlagen!",
     "Lesen fehlgeschlagen!","Lesen: Tag erkannt","Schreiben fehlgeschlagen!","Schreiben erfolgreich!","Auto: Tag erkannt","Zurueck",
     "Tag Informationen","Hersteller","Material","Farbe","FEHLER: PN532 nicht gefunden!","Lesen","Schreiben","Einstellungen","Sprache","Sprache waehlen",
@@ -501,7 +501,7 @@ static const char* const UI_STR[LANG_COUNT][STR_COUNT] = {
     "Dunkelblau","Lavendel","Lime","Royalblau","Himmelblau","Violett","Rosa","Rot","Beige","Silber","Braun","Khaki","Orange","Bronze"
   },
   {
-    "BoxRFID - Main Menu","Read Tag","Write Tag","Auto: ON","Auto: OFF","Ready to read",
+    "k9rfid- Main Menu","Read Tag","Write Tag","Auto: ON","Auto: OFF","Ready to read",
     "Configure","Select material","Select color","Waiting for tag...","NFC busy!","No tag found","Auth failed!",
     "Read failed!","Read: tag detected","Write failed!","Write successful!","Auto: tag detected","Back",
     "Tag information","Manufacturer","Material","Color","ERROR: PN532 not found!","Read","Write","Settings","Language","Select language",
@@ -510,7 +510,7 @@ static const char* const UI_STR[LANG_COUNT][STR_COUNT] = {
     "Dark Blue","Lavender","Lime","Royal Blue","Sky Blue","Violet","Rose","Red","Beige","Silver","Brown","Khaki","Orange","Bronze"
   },
   {
-    "BoxRFID - Menu","Leer Tag","Escribir Tag","Auto: ON","Auto: OFF","Listo para leer",
+    "k9rfid - Menu","Leer Tag","Escribir Tag","Auto: ON","Auto: OFF","Listo para leer",
     "Configurar","Elegir material","Elegir color","Esperando tag...","NFC ocupado!","No se encontro tag","Fallo de auth!",
     "Fallo de lectura!","Leido: tag detectado","Fallo de escritura!","Escritura OK!","Auto: tag detectado","Atras",
     "Info del tag","Fabricante","Material","Color","ERROR: PN532 no encontrado!","Leer","Escribir","Ajustes","Idioma","Elegir idioma",
@@ -519,7 +519,7 @@ static const char* const UI_STR[LANG_COUNT][STR_COUNT] = {
     "Azul oscuro","Lavanda","Lima","Azul rey","Azul cielo","Violeta","Rosado","Rojo","Beige","Plata","Marron","Caqui","Naranja","Bronce"
   },
   {
-    "BoxRFID - Menu","Ler Tag","Escrever Tag","Auto: ON","Auto: OFF","Pronto para ler",
+    "k9rfid - Menu","Ler Tag","Escrever Tag","Auto: ON","Auto: OFF","Pronto para ler",
     "Configurar","Escolher material","Escolher cor","Aguardando tag...","NFC ocupado!","Nenhum tag","Falha de auth!",
     "Falha na leitura!","Leitura: tag detectado","Falha na escrita!","Escrita OK!","Auto: tag detectado","Voltar",
     "Info do tag","Fabricante","Material","Cor","ERRO: PN532 nao encontrado!","Ler","Escrever","Definicoes","Idioma","Selecionar idioma",
@@ -528,7 +528,7 @@ static const char* const UI_STR[LANG_COUNT][STR_COUNT] = {
     "Azul escuro","Lavanda","Lima","Azul royal","Azul ceu","Violeta","Rose","Vermelho","Bege","Prata","Marrom","Caqui","Laranja","Bronze"
   },
   {
-    "BoxRFID - Menu","Lire Tag","Ecrire Tag","Auto: ON","Auto: OFF","Pret a lire",
+    "k9rfid - Menu","Lire Tag","Ecrire Tag","Auto: ON","Auto: OFF","Pret a lire",
     "Configurer","Choisir mat.","Choisir couleur","Attente du tag...","NFC occupe!","Aucun tag","Auth echouee!",
     "Lecture echouee!","Lu: tag detecte","Ecriture echouee!","Ecriture OK!","Auto: tag detecte","Retour",
     "Info du tag","Fabricant","Materiau","Couleur","ERREUR: PN532 introuvable!","Lire","Ecrire","Reglages","Langue","Choisir langue",
@@ -537,7 +537,7 @@ static const char* const UI_STR[LANG_COUNT][STR_COUNT] = {
     "Bleu fonce","Lavande","Citron vert","Bleu royal","Bleu ciel","Violet","Rose","Rouge","Beige","Argent","Marron","Kaki","Orange","Bronze"
   },
   {
-    "BoxRFID - Menu principale","Leggi tag","Scrivi tag","Auto: ON","Auto: OFF","Pronto per leggere",
+    "k9rfid- Menu principale","Leggi tag","Scrivi tag","Auto: ON","Auto: OFF","Pronto per leggere",
     "Configura","Seleziona materiale","Seleziona colore","In attesa del tag...","NFC occupato!","Nessun tag trovato","Auth fallita!",
     "Lettura fallita!","Lettura: tag rilevato","Scrittura fallita!","Scrittura riuscita!","Auto: tag rilevato","Indietro",
     "Informazioni tag","Produttore","Materiale","Colore","ERRORE: PN532 non trovato!","Leggi","Scrivi","Impostazioni","Lingua","Seleziona lingua",
@@ -1688,7 +1688,7 @@ static const char* screensaverModeLabel() {
 
 static void chooseScreensaverPosition() {
   tft.setTextDatum(TL_DATUM);
-  int textW = tft.textWidth("BoxRFID", 4);
+  int textW = tft.textWidth("K.9", 4);
   const int textH = 26;
   const int leftPad = 8;
   const int topPad = 8;
@@ -1705,7 +1705,7 @@ static void drawScreensaver() {
   tft.fillScreen(TFT_BLACK);
   tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
   tft.setTextDatum(TL_DATUM);
-  tft.drawString("BoxRFID", screensaverTextX, screensaverTextY, 4);
+  tft.drawString("K.9", screensaverTextX, screensaverTextY, 4);
 }
 
 static bool screensaverTagPresent() {
@@ -1787,15 +1787,15 @@ static const char* currentVarPrefsNs() {
 
 static const char* listBackupPathForNs(const char* nsName) {
   if (!nsName) return nullptr;
-  if (strcmp(nsName, PREF_NS_MAT_QIDI) == 0) return "/boxrfid/lists/matq.json";
-  if (strcmp(nsName, PREF_NS_MAT_QIDI_Q2) == 0) return "/boxrfid/lists/matq2.json";
-  if (strcmp(nsName, PREF_NS_MAT_QIDI_M4) == 0) return "/boxrfid/lists/matm4.json";
-  if (strcmp(nsName, PREF_NS_MAT_OS) == 0) return "/boxrfid/lists/mato.json";
-  if (strcmp(nsName, PREF_NS_MFG_QIDI) == 0) return "/boxrfid/lists/mfgq.json";
-  if (strcmp(nsName, PREF_NS_MFG_QIDI_Q2) == 0) return "/boxrfid/lists/mfgq2.json";
-  if (strcmp(nsName, PREF_NS_MFG_QIDI_M4) == 0) return "/boxrfid/lists/mfgm4.json";
-  if (strcmp(nsName, PREF_NS_MFG_OS) == 0) return "/boxrfid/lists/mfgo.json";
-  if (strcmp(nsName, PREF_NS_VAR_OS) == 0) return "/boxrfid/lists/varo.json";
+  if (strcmp(nsName, PREF_NS_MAT_QIDI) == 0) return "/k9rfid/lists/matq.json";
+  if (strcmp(nsName, PREF_NS_MAT_QIDI_Q2) == 0) return "/k9rfid/lists/matq2.json";
+  if (strcmp(nsName, PREF_NS_MAT_QIDI_M4) == 0) return "/k9rfid/lists/matm4.json";
+  if (strcmp(nsName, PREF_NS_MAT_OS) == 0) return "/k9rfid/lists/mato.json";
+  if (strcmp(nsName, PREF_NS_MFG_QIDI) == 0) return "/k9rfid/lists/mfgq.json";
+  if (strcmp(nsName, PREF_NS_MFG_QIDI_Q2) == 0) return "/k9rfid/lists/mfgq2.json";
+  if (strcmp(nsName, PREF_NS_MFG_QIDI_M4) == 0) return "/k9rfid/lists/mfgm4.json";
+  if (strcmp(nsName, PREF_NS_MFG_OS) == 0) return "/k9rfid/lists/mfgo.json";
+  if (strcmp(nsName, PREF_NS_VAR_OS) == 0) return "/k9rfid/lists/varo.json";
   return nullptr;
 }
 
@@ -2302,7 +2302,7 @@ static void drawMainMenuStatus() {
   tft.fillRect(0, TFT_H - UI_STATUS_H + 1, TFT_W, UI_STATUS_H - 1, TFT_BLACK);
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
   tft.setTextDatum(MC_DATUM);
-  tft.drawString("BoxRFID OpenSpool Edition by TinkerBarn", TFT_W / 2, TFT_H - UI_STATUS_H / 2, 1);
+  tft.drawString("K.9 RFID Spool Manager - Built by Joe the Builder", TFT_W / 2, TFT_H - UI_STATUS_H / 2, 1);
   tft.setTextDatum(TL_DATUM);
 }
 
@@ -2904,7 +2904,7 @@ static bool saveSetupBackupToSd() {
 
   JsonDocument doc;
   doc["schema"] = SETUP_BACKUP_SCHEMA_VERSION;
-  doc["format"] = "boxrfid_setup";
+  doc["format"] = "k9rfid_setup";
   doc["app_version"] = APP_VERSION;
 
   JsonObject settings = doc["settings"].to<JsonObject>();
@@ -3460,7 +3460,7 @@ static void handleWifiHttpClient() {
       max4CfgPresent = SD.exists(OFFICIAL_CFG_PATH_MAX4);
     }
     html += F("<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>");
-    html += F("<title>BoxRFID CFG Upload</title><style>");
+    html += F("<title>K.9 CFG Upload</title><style>");
     html += F("body{font:15px Arial,sans-serif;max-width:720px;margin:18px auto;padding:0 14px;background:#f4f6f8;color:#17212b}");
     html += F("h1{font-size:28px;margin:0 0 10px}p{margin:8px 0}code{background:#e8edf2;padding:2px 5px;border-radius:4px}");
     html += F(".card{background:#fff;border:1px solid #d8e0e8;border-radius:12px;padding:14px 14px 8px;margin:12px 0}");
@@ -3469,7 +3469,7 @@ static void handleWifiHttpClient() {
     html += F("label{display:block;font-weight:700;margin-bottom:6px}.pick{display:inline-block;background:#e8edf2;color:#17212b;border:1px solid #c8d2dc;border-radius:8px;padding:9px 12px;font-weight:700;cursor:pointer}");
     html += F(".file{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:6px 0 10px}.name{color:#4f5d6b}.meta{font-size:13px;color:#4f5d6b;margin:-2px 0 10px}.present{color:#1f6f43;font-weight:700}.hide{display:none}");
     html += F("button,.linkbtn{background:#1d4f91;color:#fff;border:0;border-radius:8px;padding:10px 14px;font-weight:700;text-decoration:none;display:inline-block}.sub{background:#5b6775}#msg{margin-top:12px;font-weight:700;min-height:20px}");
-    html += F("</style></head><body><h1>BoxRFID CFG Upload</h1><p>Upload <code>officiall_filas_list.cfg</code> for QIDI Q2, QIDI Plus 4, or QIDI Max 4.</p><div class='card'>");
+    html += F("</style></head><body><h1>K.9 CFG Upload</h1><p>Upload <code>officiall_filas_list.cfg</code> for QIDI Q2, QIDI Plus 4, or QIDI Max 4.</p><div class='card'>");
     if (sdAvailable) {
       html += F("<div class='ok'>MicroSD card detected and ready.</div>");
     } else {
@@ -3507,7 +3507,7 @@ static void handleWifiHttpClient() {
     html.reserve(2600);
     buildSdContentList();
     html += F("<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>");
-    html += F("<title>BoxRFID SD Content</title><style>body{font:15px Arial,sans-serif;max-width:760px;margin:18px auto;padding:0 14px;background:#f4f6f8;color:#17212b}h1{font-size:28px;margin:0 0 10px}.card{background:#fff;border:1px solid #d8e0e8;border-radius:12px;padding:14px;margin:12px 0}.bad{background:#5f6670;color:#fff;padding:10px 12px;border-radius:10px}ul{margin:10px 0 0 20px;padding:0}li{margin:4px 0}.linkbtn{background:#1d4f91;color:#fff;border-radius:8px;padding:10px 14px;font-weight:700;text-decoration:none;display:inline-block}</style></head><body>");
+    html += F("<title>K.9 SD Content</title><style>body{font:15px Arial,sans-serif;max-width:760px;margin:18px auto;padding:0 14px;background:#f4f6f8;color:#17212b}h1{font-size:28px;margin:0 0 10px}.card{background:#fff;border:1px solid #d8e0e8;border-radius:12px;padding:14px;margin:12px 0}.bad{background:#5f6670;color:#fff;padding:10px 12px;border-radius:10px}ul{margin:10px 0 0 20px;padding:0}li{margin:4px 0}.linkbtn{background:#1d4f91;color:#fff;border-radius:8px;padding:10px 14px;font-weight:700;text-decoration:none;display:inline-block}</style></head><body>");
     html += F("<h1>MicroSD Card Content</h1><p><a class='linkbtn' href='/'>Back to upload</a></p><div class='card'>");
     if (!sdAvailable) {
       html += F("<div class='bad'>No MicroSD card detected. Insert the card and reopen this page.</div>");
@@ -3535,7 +3535,7 @@ static void handleWifiHttpClient() {
     QidiPrinterModel targetModel = qidiModelFromRequestPath(requestPath);
     const char* filePath = officialListPathForModel(targetModel);
     html += F("<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>");
-    html += F("<title>BoxRFID CFG Content</title><style>body{font:15px Arial,sans-serif;max-width:860px;margin:18px auto;padding:0 14px;background:#f4f6f8;color:#17212b}h1{font-size:28px;margin:0 0 10px}.card{background:#fff;border:1px solid #d8e0e8;border-radius:12px;padding:14px;margin:12px 0}.bad{background:#5f6670;color:#fff;padding:10px 12px;border-radius:10px}.linkbtn{background:#1d4f91;color:#fff;border-radius:8px;padding:10px 14px;font-weight:700;text-decoration:none;display:inline-block}pre{white-space:pre-wrap;word-break:break-word;background:#eef2f6;border-radius:10px;padding:12px;margin:0;font:13px Consolas,monospace}</style></head><body>");
+    html += F("<title>K.9 CFG Content</title><style>body{font:15px Arial,sans-serif;max-width:860px;margin:18px auto;padding:0 14px;background:#f4f6f8;color:#17212b}h1{font-size:28px;margin:0 0 10px}.card{background:#fff;border:1px solid #d8e0e8;border-radius:12px;padding:14px;margin:12px 0}.bad{background:#5f6670;color:#fff;padding:10px 12px;border-radius:10px}.linkbtn{background:#1d4f91;color:#fff;border-radius:8px;padding:10px 14px;font-weight:700;text-decoration:none;display:inline-block}pre{white-space:pre-wrap;word-break:break-word;background:#eef2f6;border-radius:10px;padding:12px;margin:0;font:13px Consolas,monospace}</style></head><body>");
     html += F("<h1>CFG Content</h1><p><a class='linkbtn' href='/'>Back to upload</a></p><div class='card'>");
     if (!ensureSdAccess(true)) {
       html += F("<div class='bad'>No MicroSD card detected. Insert the card and reopen this page.</div>");
