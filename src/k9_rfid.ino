@@ -1,7 +1,7 @@
 /*
-  K.9 RFID Spool Management - ESP32-2432S028R (DIYMalls / CYD) + PN532 I2C
+  K 9 RFID Spool Management - ESP32-2432S028R (DIYMalls / CYD) + PN532 I2C
   ===========================================================================
-  Version: K.9 v1.0
+  Version: K 9 v1.0
 
   Hardware:
     - ESP32-2432S028R (CYD 2.8" Resistive Touch, DIYmalls.com)
@@ -197,7 +197,7 @@ static int TFT_H = 240;
 static const int UI_HEADER_H = 32;
 static const int UI_STATUS_H = 24;
 
-static const char* APP_VERSION = "K.9 v1.0";
+static const char* APP_VERSION = "K 9 v1.0";
 static const char* WIFI_HOSTNAME = "k9rfid";
 
 static const int BL_PWM_FREQ = 5000;
@@ -492,7 +492,7 @@ enum UiStrId : uint16_t {
 
 static const char* const UI_STR[LANG_COUNT][STR_COUNT] = {
   {
-    "k9rfid - Hauptmenue","Tag Lesen","Tag Schreiben","Auto: AN","Auto: AUS","Bereit zum Lesen",
+    "K 9 RFID Spool Manager - Hauptmenue","Tag Lesen","Tag Schreiben","Auto: AN","Auto: AUS","Bereit zum Lesen",
     "Konfiguration","Material auswaehlen","Farbe auswaehlen","Warte auf Tag...","NFC beschaeftigt!","Kein Tag gefunden","Auth fehlgeschlagen!",
     "Lesen fehlgeschlagen!","Lesen: Tag erkannt","Schreiben fehlgeschlagen!","Schreiben erfolgreich!","Auto: Tag erkannt","Zurueck",
     "Tag Informationen","Hersteller","Material","Farbe","FEHLER: PN532 nicht gefunden!","Lesen","Schreiben","Einstellungen","Sprache","Sprache waehlen",
@@ -501,7 +501,7 @@ static const char* const UI_STR[LANG_COUNT][STR_COUNT] = {
     "Dunkelblau","Lavendel","Lime","Royalblau","Himmelblau","Violett","Rosa","Rot","Beige","Silber","Braun","Khaki","Orange","Bronze"
   },
   {
-    "k9rfid- Main Menu","Read Tag","Write Tag","Auto: ON","Auto: OFF","Ready to read",
+    "K 9 RFID Spool Manager- Main Menu","Read Tag","Write Tag","Auto: ON","Auto: OFF","Ready to read",
     "Configure","Select material","Select color","Waiting for tag...","NFC busy!","No tag found","Auth failed!",
     "Read failed!","Read: tag detected","Write failed!","Write successful!","Auto: tag detected","Back",
     "Tag information","Manufacturer","Material","Color","ERROR: PN532 not found!","Read","Write","Settings","Language","Select language",
@@ -510,7 +510,7 @@ static const char* const UI_STR[LANG_COUNT][STR_COUNT] = {
     "Dark Blue","Lavender","Lime","Royal Blue","Sky Blue","Violet","Rose","Red","Beige","Silver","Brown","Khaki","Orange","Bronze"
   },
   {
-    "k9rfid - Menu","Leer Tag","Escribir Tag","Auto: ON","Auto: OFF","Listo para leer",
+    "K 9 RFID Spool Manager - Menu","Leer Tag","Escribir Tag","Auto: ON","Auto: OFF","Listo para leer",
     "Configurar","Elegir material","Elegir color","Esperando tag...","NFC ocupado!","No se encontro tag","Fallo de auth!",
     "Fallo de lectura!","Leido: tag detectado","Fallo de escritura!","Escritura OK!","Auto: tag detectado","Atras",
     "Info del tag","Fabricante","Material","Color","ERROR: PN532 no encontrado!","Leer","Escribir","Ajustes","Idioma","Elegir idioma",
@@ -519,7 +519,7 @@ static const char* const UI_STR[LANG_COUNT][STR_COUNT] = {
     "Azul oscuro","Lavanda","Lima","Azul rey","Azul cielo","Violeta","Rosado","Rojo","Beige","Plata","Marron","Caqui","Naranja","Bronce"
   },
   {
-    "k9rfid - Menu","Ler Tag","Escrever Tag","Auto: ON","Auto: OFF","Pronto para ler",
+    "K 9 RFID Spool Manager - Menu","Ler Tag","Escrever Tag","Auto: ON","Auto: OFF","Pronto para ler",
     "Configurar","Escolher material","Escolher cor","Aguardando tag...","NFC ocupado!","Nenhum tag","Falha de auth!",
     "Falha na leitura!","Leitura: tag detectado","Falha na escrita!","Escrita OK!","Auto: tag detectado","Voltar",
     "Info do tag","Fabricante","Material","Cor","ERRO: PN532 nao encontrado!","Ler","Escrever","Definicoes","Idioma","Selecionar idioma",
@@ -528,7 +528,7 @@ static const char* const UI_STR[LANG_COUNT][STR_COUNT] = {
     "Azul escuro","Lavanda","Lima","Azul royal","Azul ceu","Violeta","Rose","Vermelho","Bege","Prata","Marrom","Caqui","Laranja","Bronze"
   },
   {
-    "k9rfid - Menu","Lire Tag","Ecrire Tag","Auto: ON","Auto: OFF","Pret a lire",
+    "K 9 RFID Spool Manager - Menu","Lire Tag","Ecrire Tag","Auto: ON","Auto: OFF","Pret a lire",
     "Configurer","Choisir mat.","Choisir couleur","Attente du tag...","NFC occupe!","Aucun tag","Auth echouee!",
     "Lecture echouee!","Lu: tag detecte","Ecriture echouee!","Ecriture OK!","Auto: tag detecte","Retour",
     "Info du tag","Fabricant","Materiau","Couleur","ERREUR: PN532 introuvable!","Lire","Ecrire","Reglages","Langue","Choisir langue",
@@ -537,7 +537,7 @@ static const char* const UI_STR[LANG_COUNT][STR_COUNT] = {
     "Bleu fonce","Lavande","Citron vert","Bleu royal","Bleu ciel","Violet","Rose","Rouge","Beige","Argent","Marron","Kaki","Orange","Bronze"
   },
   {
-    "k9rfid- Menu principale","Leggi tag","Scrivi tag","Auto: ON","Auto: OFF","Pronto per leggere",
+    "K 9 RFID Spool Manager- Menu principale","Leggi tag","Scrivi tag","Auto: ON","Auto: OFF","Pronto per leggere",
     "Configura","Seleziona materiale","Seleziona colore","In attesa del tag...","NFC occupato!","Nessun tag trovato","Auth fallita!",
     "Lettura fallita!","Lettura: tag rilevato","Scrittura fallita!","Scrittura riuscita!","Auto: tag rilevato","Indietro",
     "Informazioni tag","Produttore","Materiale","Colore","ERRORE: PN532 non trovato!","Leggi","Scrivi","Impostazioni","Lingua","Seleziona lingua",
@@ -1705,7 +1705,7 @@ static void drawScreensaver() {
   tft.fillScreen(TFT_BLACK);
   tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
   tft.setTextDatum(TL_DATUM);
-  tft.drawString("K.9", screensaverTextX, screensaverTextY, 4);
+  tft.drawString("K*9", screensaverTextX, screensaverTextY, 4);
 }
 
 static bool screensaverTagPresent() {
@@ -1736,7 +1736,7 @@ static void screensaverTick() {
     needRedraw = true;
     // Drain loop with timeout - prevents getting stuck because of IRQ noise
     uint32_t drainStart = millis();
-    while ((ts.tirqTouched() || ts.touched()) && (millis() - drainStart < 800)) {
+    while (ts.touched() || ts.touched() & (millis() - drainStart < 800)) {
       delay(10);
     }
     return;
@@ -2302,7 +2302,7 @@ static void drawMainMenuStatus() {
   tft.fillRect(0, TFT_H - UI_STATUS_H + 1, TFT_W, UI_STATUS_H - 1, TFT_BLACK);
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
   tft.setTextDatum(MC_DATUM);
-  tft.drawString("K.9 RFID Spool Manager - Built by Joe the Builder", TFT_W / 2, TFT_H - UI_STATUS_H / 2, 1);
+  tft.drawString("K 9 RFID Spool Manager - Built by Joe the Builder", TFT_W / 2, TFT_H - UI_STATUS_H / 2, 1);
   tft.setTextDatum(TL_DATUM);
 }
 
@@ -4022,8 +4022,9 @@ static bool getTouchRaw(int& rx, int& ry, int& rz) {
   if (wifiUploadActive) return false;
   selectTouchSpi();
   ts.isrWake = true;
-  if (!ts.touched()) return false;
-  TS_Point p = ts.getPoint();
+  
+if (!ts.touched()) return false;
+  TS_Point p =ts.getPoint();
   rx = p.x; ry = p.y; rz = p.z;
   return true;
 }
@@ -7852,7 +7853,7 @@ static void uiTick() {
 
   if (screensaverActive) {
     screensaverTick();
-    return;
+drawK9SplashScreen();    return;
   }
 
   bool tagInfoVisible =
@@ -7902,6 +7903,185 @@ static void uiTick() {
   uiRedrawIfNeeded();
 }
 
+void drawK9SplashScreen() {
+  uint16_t BG    = tft.color565(26, 18, 0);
+  uint16_t ORANGE = tft.color565(255, 122, 0);
+  uint16_t MUTED = tft.color565(100, 80, 40);
+  uint16_t DIM   = tft.color565(80, 48, 0);
+
+  tft.fillScreen(BG);
+
+  // Corner ticks
+  tft.drawFastHLine(4, 4, 10, DIM);
+  tft.drawFastVLine(4, 4, 10, DIM);
+  tft.drawFastHLine(TFT_W - 14, 4, 10, DIM);
+  tft.drawFastVLine(TFT_W - 5, 4, 10, DIM);
+  tft.drawFastHLine(4, TFT_H - 5, 10, DIM);
+  tft.drawFastVLine(4, TFT_H - 14, 10, DIM);
+  tft.drawFastHLine(TFT_W - 14, TFT_H - 5, 10, DIM);
+  tft.drawFastVLine(TFT_W - 5, TFT_H - 14, 10, DIM);
+
+  // Big K.9
+  tft.setTextDatum(TC_DATUM);
+  tft.setTextColor(ORANGE, BG);
+  tft.setTextSize(5);
+tft.drawString("K", TFT_W / 2 - 40, 28);
+tft.fillCircle(TFT_W / 2 - 22, 62, 7, ORANGE);
+tft.drawString("9", TFT_W / 2 + 18, 28);
+  // Flanking lines + Affirmative!
+  tft.drawFastHLine(20, 98, 60, ORANGE);
+  tft.drawFastHLine(TFT_W - 80, 98, 60, ORANGE);
+  tft.setTextSize(1);
+
+  // Divider
+  tft.drawFastHLine(20, 112, TFT_W - 40, DIM);
+
+  // Bylines
+  tft.setTextColor(MUTED, BG);
+  tft.drawString("BUILT BY JOE THE BUILDER", TFT_W / 2, 122);
+  tft.drawString("RFID SPOOL MANAGER K.9 v1.0", TFT_W / 2, 136);
+
+  // Loading bar
+  tft.drawRect(20, 158, TFT_W - 40, 6, DIM);
+  for (int i = 0; i <= TFT_W - 42; i += 4) {
+    tft.fillRect(21, 159, i, 4, ORANGE);
+    delay(8);
+  }
+
+  // Status
+  tft.setTextColor(ORANGE, BG);
+  tft.drawString("Affirmative! K.9 ready.", TFT_W / 2, 172);
+  delay(1000);
+}
+// ==================== Anycubic ACE Tag Read/Write ====================
+
+static void intToByteLE(int value, uint8_t* out) {
+  out[0] = value & 0xFF;
+  out[1] = (value >> 8) & 0xFF;
+}
+
+static int byteToIntLE(uint8_t* data) {
+  return (int)data[0] | ((int)data[1] << 8);
+}
+
+static bool aceReadTag(String& material, String& brand, String& sku, uint16_t& r, uint16_t& g, uint16_t& b, int& extMin, int& extMax, int& bedMin, int& bedMax) {
+  uint8_t page[4];
+
+  // Check magic byte page 4
+  if (!readPageRetry(4, page)) return false;
+  if (page[0] != 0x7B) return false;
+
+  // SKU pages 5-8
+  char skuBuf[17] = {0};
+  for (uint8_t p = 0; p < 4; p++) {
+    if (!readPageRetry(5 + p, page)) return false;
+    for (uint8_t i = 0; i < 4; i++) {
+      if ((p * 4 + i) < 16 && page[i] != 0) skuBuf[p * 4 + i] = (char)page[i];
+    }
+  }
+  sku = String(skuBuf);
+
+  // Brand pages 10-13
+  char brandBuf[17] = {0};
+  for (uint8_t p = 0; p < 4; p++) {
+    if (!readPageRetry(10 + p, page)) return false;
+    for (uint8_t i = 0; i < 4; i++) {
+      if ((p * 4 + i) < 16 && page[i] != 0) brandBuf[p * 4 + i] = (char)page[i];
+    }
+  }
+  brand = String(brandBuf);
+
+  // Type pages 15-18
+  char typeBuf[17] = {0};
+  for (uint8_t p = 0; p < 4; p++) {
+    if (!readPageRetry(15 + p, page)) return false;
+    for (uint8_t i = 0; i < 4; i++) {
+      if ((p * 4 + i) < 16 && page[i] != 0) typeBuf[p * 4 + i] = (char)page[i];
+    }
+  }
+  material = String(typeBuf);
+
+  // Color page 20 (ABGR format)
+  if (!readPageRetry(20, page)) return false;
+  b = page[0];
+  g = page[1];
+  r = page[2];
+
+  // Extruder temp page 24
+  if (!readPageRetry(24, page)) return false;
+  extMin = byteToIntLE(page);
+  extMax = byteToIntLE(page + 2);
+
+  // Bed temp page 29
+  if (!readPageRetry(29, page)) return false;
+  bedMin = byteToIntLE(page);
+  bedMax = byteToIntLE(page + 2);
+
+  return true;
+}
+
+static bool aceWriteTag(const String& material, const String& brand, const String& sku,
+                        uint8_t r, uint8_t g, uint8_t b,
+                        int extMin, int extMax, int bedMin, int bedMax,
+                        int diameter100, int lengthM) {
+  uint8_t page[4];
+
+  // Magic byte page 4
+  uint8_t hdr[4] = {0x7B, 0x00, 0x65, 0x00};
+  if (!writePageRetry(4, hdr)) return false;
+
+  // SKU pages 5-8
+  uint8_t skuData[16] = {0};
+  for (uint8_t i = 0; i < 16 && i < sku.length(); i++) skuData[i] = (uint8_t)sku.charAt(i);
+  for (uint8_t p = 0; p < 4; p++) {
+    uint8_t pg[4] = {skuData[p*4], skuData[p*4+1], skuData[p*4+2], skuData[p*4+3]};
+    if (!writePageRetry(5 + p, pg)) return false;
+  }
+
+  // Brand pages 10-13
+  uint8_t brandData[16] = {0};
+  for (uint8_t i = 0; i < 16 && i < brand.length(); i++) brandData[i] = (uint8_t)brand.charAt(i);
+  for (uint8_t p = 0; p < 4; p++) {
+    uint8_t pg[4] = {brandData[p*4], brandData[p*4+1], brandData[p*4+2], brandData[p*4+3]};
+    if (!writePageRetry(10 + p, pg)) return false;
+  }
+
+  // Type pages 15-18
+  uint8_t typeData[16] = {0};
+  for (uint8_t i = 0; i < 16 && i < material.length(); i++) typeData[i] = (uint8_t)material.charAt(i);
+  for (uint8_t p = 0; p < 4; p++) {
+    uint8_t pg[4] = {typeData[p*4], typeData[p*4+1], typeData[p*4+2], typeData[p*4+3]};
+    if (!writePageRetry(15 + p, pg)) return false;
+  }
+
+  // Color page 20 (ABGR)
+  uint8_t colorPage[4] = {b, g, r, 0x00};
+  if (!writePageRetry(20, colorPage)) return false;
+
+  // Extruder temp page 24
+  uint8_t extPage[4];
+  intToByteLE(extMin, extPage);
+  intToByteLE(extMax, extPage + 2);
+  if (!writePageRetry(24, extPage)) return false;
+
+  // Bed temp page 29
+  uint8_t bedPage[4];
+  intToByteLE(bedMin, bedPage);
+  intToByteLE(bedMax, bedPage + 2);
+  if (!writePageRetry(29, bedPage)) return false;
+
+  // Diameter/length page 30
+  uint8_t filPage[4];
+  intToByteLE(diameter100, filPage);
+  intToByteLE(lengthM, filPage + 2);
+  if (!writePageRetry(30, filPage)) return false;
+
+  // Unknown page 31
+  uint8_t unkPage[4] = {0xE8, 0x03, 0x00, 0x00};
+  if (!writePageRetry(31, unkPage)) return false;
+
+  return true;
+}
 // ==================== Arduino setup / loop ====================
 void setup() {
   Serial.begin(115200);
@@ -7951,6 +8131,7 @@ void setup() {
   tft.fillScreen(TFT_BLACK);
   tft.setTextFont(2);
   tft.setTextSize(1);
+  drawK9SplashScreen();
 
   TFT_W = tft.width();
   TFT_H = tft.height();
