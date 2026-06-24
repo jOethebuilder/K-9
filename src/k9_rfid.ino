@@ -5487,8 +5487,38 @@ static void autoDetectTick() {
   drawStatus(TXT_TAG_DETECTED[uiLang], TFT_GREEN);
   drawStatus(TXT_READING_TAG[uiLang], TFT_YELLOW);
 
-  String brand, material, subtype, colorHex;
+String brand, material, subtype, colorHex;
   if (!openSpoolReadTagPresent(brand, material, subtype, colorHex)) {
+    // Try ACE tag format
+    String aceMaterial, aceBrand, aceSku;
+    uint16_t aceR, aceG, aceB;
+    int aceExtMin, aceExtMax, aceBedMin, aceBedMax;
+    if (aceReadTag(aceMaterial, aceBrand, aceSku, aceR, aceG, aceB, aceExtMin, aceExtMax, aceBedMin, aceBedMax)) {
+      autoLastSeen = millis();
+      memcpy(autoLastOsUid, uid, uidLen);
+      autoLastOsUidLen = uidLen;
+      // Show ACE tag info
+      tft.fillScreen(TFT_BLACK);
+      drawHeader("Anycubic ACE Tag");
+      tft.setTextColor(TFT_WHITE, TFT_BLACK);
+      tft.setTextDatum(TL_DATUM);
+      tft.drawString("Brand: " + aceBrand, 16, 50, 2);
+      tft.drawString("Type:  " + aceMaterial, 16, 74, 2);
+      tft.drawString("SKU:   " + aceSku, 16, 98, 2);
+      char tempBuf[32];
+      snprintf(tempBuf, sizeof(tempBuf), "Nozzle: %d-%d C", aceExtMin, aceExtMax);
+      tft.drawString(String(tempBuf), 16, 122, 2);
+      snprintf(tempBuf, sizeof(tempBuf), "Bed:    %d-%d C", aceBedMin, aceBedMax);
+      tft.drawString(String(tempBuf), 16, 146, 2);
+      uint16_t swatchColor = tft.color565(aceR, aceG, aceB);
+      tft.fillRoundRect(16, 172, 288, 32, 6, swatchColor);
+      tft.drawRoundRect(16, 172, 288, 32, 6, TFT_WHITE);
+      autoPanelVisible = true;
+      autoLastMat = 0; autoLastCol = 0; autoLastMfg = 0;
+      noteUserActivity();
+      drawStatus("Anycubic ACE Tag", TFT_GREEN);
+      return;
+    }
     openSpoolReadCancelUntil = millis() + 2000;
     openSpoolCancelShown = false;
     autoPanelVisible = false;
@@ -8003,9 +8033,9 @@ static bool aceReadTag(String& material, String& brand, String& sku, uint16_t& r
 
   // Color page 20 (ABGR format)
   if (!readPageRetry(20, page)) return false;
-  b = page[0];
-  g = page[1];
-  r = page[2];
+  b = page[1];
+  g = page[2];
+  r = page[3];
 
   // Extruder temp page 24
   if (!readPageRetry(24, page)) return false;
