@@ -216,7 +216,7 @@ enum ManufacturerId : uint8_t {
   MFG_QIDI    = 1
 };
 
-enum TagMode : uint8_t { TAGMODE_QIDI = 0, TAGMODE_OPENSPOOL = 1 };
+enum TagMode : uint8_t { TAGMODE_QIDI = 0, TAGMODE_OPENSPOOL = 1, TAGMODE_ACE = 2 };
 enum QidiPrinterModel : uint8_t { QIDI_MODEL_PLUS4 = 0, QIDI_MODEL_Q2 = 1, QIDI_MODEL_MAX4 = 2 };
 static TagMode currentTagMode = TAGMODE_QIDI;
 static TagMode defaultTagMode = TAGMODE_QIDI;
@@ -3926,7 +3926,7 @@ static void loadLanguage() {
       uint8_t br = blob.brightness;
       uint8_t ri = blob.readInterval;
       if (v >= LANG_COUNT) v = (uint8_t)LANG_EN;
-      if (dm > (uint8_t)TAGMODE_OPENSPOOL) dm = (uint8_t)TAGMODE_QIDI;
+      if (dm > (uint8_t)TAGMODE_ACE) dm = (uint8_t)TAGMODE_QIDI;
       if (qm > (uint8_t)QIDI_MODEL_MAX4) qm = (uint8_t)QIDI_MODEL_PLUS4;
       if (sm > (uint8_t)SCREENSAVER_OFF) sm = (uint8_t)SCREENSAVER_5MIN;
       if (br < 10 || br > 100 || (br % 10) != 0) br = 80;
@@ -3966,7 +3966,7 @@ static void loadLanguage() {
     osInfoU1AddColorsEnabled = prefs.getBool(PREF_OS_U1_ADDC, false);
     osReadIntervalSec = prefs.getUChar(PREF_OS_READ_INT, 2);
     if (v >= LANG_COUNT) v = (uint8_t)LANG_EN;
-    if (dm > (uint8_t)TAGMODE_OPENSPOOL) dm = (uint8_t)TAGMODE_QIDI;
+    if (dm > (uint8_t)TAGMODE_ACE) dm = (uint8_t)TAGMODE_QIDI;
     if (qm > (uint8_t)QIDI_MODEL_MAX4) qm = (uint8_t)QIDI_MODEL_PLUS4;
     if (sm > (uint8_t)SCREENSAVER_OFF) sm = (uint8_t)SCREENSAVER_5MIN;
     if (br < 10 || br > 100 || (br % 10) != 0) br = 80;
