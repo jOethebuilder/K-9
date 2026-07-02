@@ -21,8 +21,7 @@ K 9 is a dedicated spool management tool designed to:
 - Existing support:
   - Qidi
   - Snapmaker U1
-- Next addition:
-  - Anycubic tag support
+  - Anycubic tag 
 
 ---
 
