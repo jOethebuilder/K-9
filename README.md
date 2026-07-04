@@ -1,11 +1,11 @@
-# K 9-RFID-SPOOL-MANAGEMENT
-ESP32 RFID spool management system for 3D printing (K 9 project)
+# K-9-mark1
+ESP32 RFID spool management system for 3D printing (K-9 project)
 
 ---
 
 ## What This Is
 
-K 9 is a dedicated spool management tool designed to:
+K-9 is a dedicated spool management tool designed to:
 - Read and write RFID/NFC filament tags
 - Support multiple printer formats
 - Work with a local Spoolman server
@@ -20,7 +20,7 @@ K 9 is a dedicated spool management tool designed to:
 - Touchscreen UI
 - Existing support:
   - Qidi
-  - Snapmaker U1
+  - Snapmaker U1 Via Openspool plus Openspool 
   - Anycubic tag 
 
 ---
@@ -30,7 +30,7 @@ K 9 is a dedicated spool management tool designed to:
 - ESP32
 - PN532
 - 2.8" TFT touchscreen
-- Wi-Fi (future integration)
+- Wi-Fi for the direct link to the Spoolman server
 
 ---
 
@@ -40,13 +40,14 @@ K 9 is a dedicated spool management tool designed to:
 - Multi-format spool support
 - Touch-driven interface
 - Modular design for new printer systems
-- Boot splash branding (K 9 Built by Joe the Builder)
+- Boot splash branding (K-9 mark1 Built by Joe the Builder)
 
 ---
 
 ## Roadmap
 
-- Add Anycubic support
+-Anycubic support
+-Qidi support
 - Improve auto-detection
 - Connect to Spoolman API
 - Add scale integration
