@@ -46,8 +46,8 @@ K-9 is a dedicated spool management tool designed to:
 
 ## Roadmap
 
--Anycubic support
--Qidi support
+  -Anycubic support
+  -Qidi support
 - Improve auto-detection
 - Connect to Spoolman API
 - Add scale integration
