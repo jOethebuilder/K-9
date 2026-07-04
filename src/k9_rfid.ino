@@ -187,7 +187,18 @@ const QidiColor QIDI_COLORS[] = {
   { 242, 134, 54,  "Orange"     },
   { 184, 127, 43,  "Gold"       },
 };
-
+const char* nearestColorName(uint8_t r, uint8_t g, uint8_t b) {
+  int bestIdx = 1;
+  long bestDist = 99999999;
+  for (int i = 1; i < 25; i++) {
+    long dr = (long)r - QIDI_COLORS[i].r;
+    long dg = (long)g - QIDI_COLORS[i].g;
+    long db = (long)b - QIDI_COLORS[i].b;
+    long dist = dr*dr + dg*dg + db*db;
+    if (dist < bestDist) { bestDist = dist; bestIdx = i; }
+  }
+  return QIDI_COLORS[bestIdx].name;
+}
 // ============================================================
 //  NFC HELPERS
 // ============================================================
@@ -449,7 +460,7 @@ bool aceReadTag() {
   if (readNfcPage(20, page)) {
     tagData.r = page[3]; tagData.g = page[2]; tagData.b = page[1];
   }
-  strcpy(tagData.color, "");
+strncpy(tagData.color, nearestColorName(tagData.r, tagData.g, tagData.b), sizeof(tagData.color));
 
   if (readNfcPage(24, page)) { tagData.extMin = byteToIntLE(page); tagData.extMax = byteToIntLE(page+2); }
   if (readNfcPage(29, page)) { tagData.bedMin = byteToIntLE(page); tagData.bedMax = byteToIntLE(page+2); }
