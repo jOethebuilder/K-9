@@ -1,4 +1,4 @@
-# K-9-mark1
+# K-9 mark1
 ESP32 RFID spool management system for 3D printing (K-9 project)
 
 ---
