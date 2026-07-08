@@ -18,6 +18,7 @@
 #include <TFT_eSPI.h>
 #include <XPT2046_Touchscreen.h>
 #include <Adafruit_PN532.h>
+#include <ArduinoJson.h>
 
 // ── Display ─────────────────────────────────────────────────
 TFT_eSPI tft = TFT_eSPI();
@@ -59,6 +60,7 @@ enum Screen {
   SCR_MAIN,
   SCR_QIDI,
   SCR_OPENSPOOL,
+  SCR_OPENSPOOL_ENTRY,
   SCR_ANYCUBIC,
   SCR_SETTINGS,
   SCR_NO_READER
@@ -200,6 +202,50 @@ const char* nearestColorName(uint8_t r, uint8_t g, uint8_t b) {
   return QIDI_COLORS[bestIdx].name;
 }
 // ============================================================
+//  OPENSPOOL LOOKUP TABLES
+// ============================================================
+struct OsMaterial {
+  const char* name;
+  int nozzleMin;
+  int nozzleMax;
+  int bedMin;
+  int bedMax;
+};
+
+const OsMaterial OS_MATERIALS[] = {
+  { "PLA",     190, 220,  40,  60 },
+  { "PETG",    220, 250,  70,  90 },
+  { "ABS",     230, 260,  90, 110 },
+  { "ASA",     240, 270,  90, 110 },
+  { "TPU",     210, 230,  30,  60 },
+  { "PA",      240, 270,  70, 100 },
+  { "PA12",    240, 270,  70, 100 },
+  { "PC",      270, 310, 100, 120 },
+  { "PEEK",    360, 400, 100, 140 },
+  { "PVA",     190, 220,  45,  60 },
+  { "HIPS",    230, 250,  90, 110 },
+  { "PCTG",    220, 250,  70,  85 },
+  { "PLA-CF",  190, 220,  45,  60 },
+  { "PETG-CF", 230, 260,  70,  90 },
+  { "PA-CF",   250, 280,  70, 100 },
+};
+const uint8_t OS_MATERIALS_COUNT = sizeof(OS_MATERIALS) / sizeof(OS_MATERIALS[0]);
+const char* OS_MANUFACTURERS[] = {
+  "Generic", "Snapmaker", "SUNLU", "eSun", "Jayo", "QIDI", "Bambu Lab",
+  "Polymaker", "TECBEARS", "GIANTARM", "HATCHBOX", "Overture", "Prusament",
+  "TINMORRY", "Kingroon", "Elegoo", "Creality", "Deeplee", "ANYCUBIC",
+  "FLASHFORGE", "CC3D", "ZIRO"
+};
+const uint8_t OS_MANUFACTURERS_COUNT = sizeof(OS_MANUFACTURERS) / sizeof(OS_MANUFACTURERS[0]);
+// ── OpenSpool manual entry state ───────────────────────────
+uint8_t osEntryMatIdx = 0;   // index into OS_MATERIALS
+uint8_t osEntryMfgIdx = 0;   // index into OS_MANUFACTURERS
+uint8_t osEntryColIdx = 1;   // index into QIDI_COLORS (1..24, matches nearestColorName range)
+int     osEntryBedMin = OS_MATERIALS[0].bedMin;
+int     osEntryBedMax = OS_MATERIALS[0].bedMax;
+int     osEntryNozMin = OS_MATERIALS[0].nozzleMin;
+int     osEntryNozMax = OS_MATERIALS[0].nozzleMax;
+// ============================================================
 //  NFC HELPERS
 // ============================================================
 
@@ -213,7 +259,7 @@ int byteToIntLE(uint8_t* d) {
 }
 
 bool readNfcPage(uint8_t page, uint8_t* out) {
-  for (uint8_t i = 0; i < 3; i++) {
+  for (uint8_t i = 0; i < 5; i++) {
     if (nfc.ntag2xx_ReadPage(page, out)) return true;
     delay(20);
   }
@@ -223,13 +269,28 @@ bool readNfcPage(uint8_t page, uint8_t* out) {
 bool writeNfcPage(uint8_t page, uint8_t* data) {
   uint8_t tmp[4];
   memcpy(tmp, data, 4);
-  for (uint8_t i = 0; i < 3; i++) {
+  for (uint8_t i = 0; i < 5; i++) {
     if (nfc.ntag2xx_WritePage(page, tmp)) return true;
     delay(20);
   }
   return false;
 }
+// ── OpenSpool Capability Container ──────────────────────────
+#define NTAG_CC_PAGE 3
+static const uint8_t NTAG_CC[4] = {0xE1, 0x10, 0x3E, 0x00};
 
+bool ensureOpenSpoolCC() {
+  uint8_t page[4];
+  if (!readNfcPage(NTAG_CC_PAGE, page)) return false;
+  if (memcmp(page, NTAG_CC, 4) == 0) return true;
+
+  uint8_t cc[4];
+  memcpy(cc, NTAG_CC, 4);
+  if (!writeNfcPage(NTAG_CC_PAGE, cc)) return false;
+
+  if (!readNfcPage(NTAG_CC_PAGE, page)) return false;
+  return memcmp(page, NTAG_CC, 4) == 0;
+}
 // ============================================================
 //  DRAW HELPERS
 // ============================================================
@@ -412,9 +473,81 @@ void drawSubMenu(const char* title) {
 
   drawButton(10,  170, 90, 36, C_CARD,   "BACK",  C_TEXT);
   drawButton(115, 170, 90, 36, writeBg,  "WRITE", writeFg);
-  drawButton(220, 170, 90, 36, clearBg,  "CLEAR", clearFg);
+if (currentScreen == SCR_OPENSPOOL) {
+    drawButton(220, 170, 90, 36, C_ORANGE_D, "READ", C_TEXT);
+  } else {
+    drawButton(220, 170, 90, 36, clearBg,  "CLEAR", clearFg);
+  }
 
   drawFooter("K-9  mark 1  -  Built by Joe the Builder", C_MUTED);
+}
+
+// ============================================================
+//  OPENSPOOL MANUAL ENTRY SCREEN
+// ============================================================
+void drawOpenSpoolEntry() {
+  tft.fillScreen(C_BG);
+  drawHeader("K-9 — Manual Entry");
+
+  // Manufacturer field
+  tft.fillRect(10, 30, W-20, 34, C_CARD);
+  tft.drawRect(10, 30, W-20, 34, C_ORANGE_D);
+  tft.setTextDatum(TL_DATUM);
+  tft.setTextColor(C_MUTED, C_CARD);
+  tft.drawString("MANUFACTURER", 44, 34, 1);
+  tft.setTextDatum(MC_DATUM);
+  tft.setTextColor(C_ORANGE, C_CARD);
+  tft.drawString(OS_MANUFACTURERS[osEntryMfgIdx], W/2, 52, 2);
+  drawButton(10, 30, 26, 34, C_ORANGE_D, "<", C_TEXT);
+  drawButton(W-36, 30, 26, 34, C_ORANGE_D, ">", C_TEXT);
+
+  // Material field
+  tft.fillRect(10, 68, W-20, 34, C_CARD);
+  tft.drawRect(10, 68, W-20, 34, C_ORANGE_D);
+  tft.setTextDatum(TL_DATUM);
+  tft.setTextColor(C_MUTED, C_CARD);
+  tft.drawString("MATERIAL", 44, 72, 1);
+  tft.setTextDatum(MC_DATUM);
+  tft.setTextColor(C_ORANGE, C_CARD);
+  tft.drawString(OS_MATERIALS[osEntryMatIdx].name, W/2, 90, 2);
+  drawButton(10, 68, 26, 34, C_ORANGE_D, "<", C_TEXT);
+  drawButton(W-36, 68, 26, 34, C_ORANGE_D, ">", C_TEXT);
+
+  // Color field
+  tft.fillRect(10, 106, W-20, 34, C_CARD);
+  tft.drawRect(10, 106, W-20, 34, C_ORANGE_D);
+  tft.setTextDatum(TL_DATUM);
+  tft.setTextColor(C_MUTED, C_CARD);
+  tft.drawString("COLOR", 44, 110, 1);
+  tft.setTextDatum(MC_DATUM);
+  tft.setTextColor(C_ORANGE, C_CARD);
+  tft.drawString(QIDI_COLORS[osEntryColIdx].name, W/2, 128, 2);
+  uint16_t colorSw = tft.color565(QIDI_COLORS[osEntryColIdx].r,
+                                   QIDI_COLORS[osEntryColIdx].g,
+                                   QIDI_COLORS[osEntryColIdx].b);
+  tft.fillRect(W-46, 114, 20, 18, colorSw);
+  tft.drawRect(W-46, 114, 20, 18, C_ORANGE_D);
+  drawButton(10, 106, 26, 34, C_ORANGE_D, "<", C_TEXT);
+  drawButton(W-36, 106, 26, 34, C_ORANGE_D, ">", C_TEXT);
+
+  // Nozzle temp row
+  tft.fillRect(10, 144, W-20, 26, C_CARD);
+  tft.drawRect(10, 144, W-20, 26, C_ORANGE_D);
+  tft.setTextDatum(TL_DATUM);
+  tft.setTextColor(C_MUTED, C_CARD);
+  tft.drawString("NOZZLE", 44, 148, 1);
+  char buf[24];
+  snprintf(buf, sizeof(buf), "%d-%d C", osEntryNozMin, osEntryNozMax);
+  tft.setTextDatum(MC_DATUM);
+  tft.setTextColor(C_TEXT, C_CARD);
+  tft.drawString(buf, W/2, 157, 2);
+  drawButton(10, 144, 26, 26, C_ORANGE_D, "-", C_TEXT);
+  drawButton(W-36, 144, 26, 26, C_ORANGE_D, "+", C_TEXT);
+
+  drawFooter("K-9  mark 1  -  Built by Joe the Builder", C_MUTED);
+
+  drawButton(10,  176, 90, 34, C_CARD,   "BACK", C_TEXT);
+  drawButton(115, 176, 90, 34, C_ORANGE, "SAVE", C_BLACK);
 }
 
 // ============================================================
@@ -460,7 +593,7 @@ bool aceReadTag() {
   if (readNfcPage(20, page)) {
     tagData.r = page[3]; tagData.g = page[2]; tagData.b = page[1];
   }
-strncpy(tagData.color, nearestColorName(tagData.r, tagData.g, tagData.b), sizeof(tagData.color));
+  strncpy(tagData.color, nearestColorName(tagData.r, tagData.g, tagData.b), sizeof(tagData.color));
 
   if (readNfcPage(24, page)) { tagData.extMin = byteToIntLE(page); tagData.extMax = byteToIntLE(page+2); }
   if (readNfcPage(29, page)) { tagData.bedMin = byteToIntLE(page); tagData.bedMax = byteToIntLE(page+2); }
@@ -475,6 +608,229 @@ strncpy(tagData.color, nearestColorName(tagData.r, tagData.g, tagData.b), sizeof
 bool aceWriteTag() {
   // TODO: implement when NTAG215 tags available
   return false;
+}
+
+// ============================================================
+//  OPENSPOOL TAG READ
+// ============================================================
+
+// Find NDEF TLV record in buffer (TinkerBarn compatible)
+bool findNdefTlv(const uint8_t* buf, size_t len, size_t& ndefOffset, size_t& ndefLen) {
+  size_t i = 0;
+  while (i < len) {
+    uint8_t t = buf[i];
+    if (t == 0x00) { i++; continue; }
+    if (t == 0xFE || i + 1 >= len) return false;
+    if (t == 0x03) {
+      uint8_t l = buf[i + 1];
+      if (l == 0xFF) {
+        if (i + 3 >= len) return false;
+        ndefLen = ((size_t)buf[i + 2] << 8) | buf[i + 3];
+        ndefOffset = i + 4;
+      } else {
+        ndefLen = l;
+        ndefOffset = i + 2;
+      }
+      return (ndefOffset + ndefLen <= len);
+    }
+    uint8_t l = buf[i + 1];
+    if (l == 0xFF) {
+      if (i + 3 >= len) return false;
+      size_t longLen = ((size_t)buf[i + 2] << 8) | buf[i + 3];
+      i += 4 + longLen;
+    } else {
+      i += 2 + l;
+    }
+  }
+  return false;
+}
+
+// Parse MIME record from NDEF
+bool parseMimeRecord(const uint8_t* ndef, size_t ndefLen, String& mime, String& payload) {
+  if (ndefLen < 3) return false;
+  uint8_t hdr = ndef[0];
+  bool sr = hdr & 0x10;
+  bool il = hdr & 0x08;
+  uint8_t tnf = hdr & 0x07;
+  if (tnf != 0x02) return false;
+  size_t p = 1;
+  uint8_t typeLen = ndef[p++];
+  uint32_t payloadLen = 0;
+  if (sr) {
+    if (p >= ndefLen) return false;
+    payloadLen = ndef[p++];
+  } else {
+    if (p + 3 >= ndefLen) return false;
+    payloadLen = ((uint32_t)ndef[p] << 24) | ((uint32_t)ndef[p+1] << 16) | ((uint32_t)ndef[p+2] << 8) | ndef[p+3];
+    p += 4;
+  }
+  uint8_t idLen = 0;
+  if (il) { if (p >= ndefLen) return false; idLen = ndef[p++]; }
+  if (p + typeLen + idLen + payloadLen > ndefLen) return false;
+  mime = ""; payload = "";
+  for (uint8_t i = 0; i < typeLen; i++) mime += (char)ndef[p + i];
+  p += typeLen + idLen;
+  for (uint32_t i = 0; i < payloadLen; i++) payload += (char)ndef[p + i];
+  return true;
+}
+
+bool buildOpenSpoolNdefFromJson(const String& json, uint8_t* out, size_t outMax, size_t& outLen) {
+  const char* mime = "application/json";
+  const uint8_t typeLen = (uint8_t)strlen(mime);
+  const size_t payloadLen = json.length();
+  const bool shortRecord = payloadLen <= 255;
+  const size_t recordLen = 1 + 1 + (shortRecord ? 1 : 4) + typeLen + payloadLen;
+  const bool shortTlv = recordLen <= 254;
+  const size_t totalLen = 1 + (shortTlv ? 1 : 3) + recordLen + 1;
+  if (totalLen > outMax) return false;
+  size_t p = 0;
+  out[p++] = 0x03;
+  if (shortTlv) {
+    out[p++] = (uint8_t)recordLen;
+  } else {
+    out[p++] = 0xFF;
+    out[p++] = (uint8_t)((recordLen >> 8) & 0xFF);
+    out[p++] = (uint8_t)(recordLen & 0xFF);
+  }
+  out[p++] = shortRecord ? 0xD2 : 0xC2;
+  out[p++] = typeLen;
+  if (shortRecord) {
+    out[p++] = (uint8_t)payloadLen;
+  } else {
+    out[p++] = (uint8_t)((payloadLen >> 24) & 0xFF);
+    out[p++] = (uint8_t)((payloadLen >> 16) & 0xFF);
+    out[p++] = (uint8_t)((payloadLen >> 8) & 0xFF);
+    out[p++] = (uint8_t)(payloadLen & 0xFF);
+  }
+  memcpy(out + p, mime, typeLen); p += typeLen;
+  memcpy(out + p, json.c_str(), payloadLen); p += payloadLen;
+  out[p++] = 0xFE;
+  outLen = p;
+  return true;
+}
+
+bool openSpoolReadTag() {
+  // Read NTAG user pages (pages 4 onwards)
+  const uint8_t FIRST_PAGE = 4;
+  const uint8_t MAX_PAGES  = 120;
+  static uint8_t buf[480];
+  memset(buf, 0, sizeof(buf));
+  size_t offset = 0;
+  for (uint8_t p = FIRST_PAGE; p < FIRST_PAGE + MAX_PAGES; p++) {
+    uint8_t page[4];
+    if (!readNfcPage(p, page)) {
+      if (p < FIRST_PAGE + 4) return false;
+      break;
+    }
+    memcpy(buf + offset, page, 4);
+    offset += 4;
+    delay(5);   // let the PN532/tag settle between page reads
+    // Check if we found a complete NDEF record already
+    size_t ndefOff = 0, ndefLen = 0;
+    if (findNdefTlv(buf, offset, ndefOff, ndefLen)) {
+      if (ndefOff + ndefLen <= offset) break; // got it all
+    }
+  }
+  Serial.print("OS pages read: "); Serial.println(offset/4);
+  Serial.print("findNdef: ");
+  size_t dbgOff=0, dbgLen=0;
+  Serial.println(findNdefTlv(buf, offset, dbgOff, dbgLen));
+  size_t ndefOffset = 0, ndefLen = 0;
+  if (!findNdefTlv(buf, offset, ndefOffset, ndefLen)) return false;
+
+  String mime, payload;
+  if (!parseMimeRecord(buf + ndefOffset, ndefLen, mime, payload)) return false;
+  if (mime != "application/json") return false;
+
+  JsonDocument doc;
+  if (deserializeJson(doc, payload)) return false;
+  if (String((const char*)doc["protocol"]) != "openspool") return false;
+
+  strncpy(tagData.manufacturer, doc["brand"] | "Generic", sizeof(tagData.manufacturer));
+  strncpy(tagData.material,     doc["type"]  | "PLA",     sizeof(tagData.material));
+
+  const char* hex = doc["color_hex"] | "808080";
+  String hexStr = String(hex);
+  hexStr.replace("#", "");
+  long color = strtol(hexStr.c_str(), nullptr, 16);
+  tagData.r = (color >> 16) & 0xFF;
+  tagData.g = (color >> 8)  & 0xFF;
+  tagData.b =  color        & 0xFF;
+  strncpy(tagData.color, nearestColorName(tagData.r, tagData.g, tagData.b), sizeof(tagData.color));
+
+  tagData.extMin = doc["min_temp"]     | 190;
+  tagData.extMax = doc["max_temp"]     | 220;
+  tagData.bedMin = doc["bed_min_temp"] | 0;
+  tagData.bedMax = doc["bed_max_temp"] | 60;
+
+  tagData.hasData = true;
+  return true;
+}
+
+// ============================================================
+//  OPENSPOOL TAG WRITE
+// ============================================================
+bool openSpoolWriteTag() {
+  if (!ensureOpenSpoolCC()) return false;
+
+  // 1. Build JSON payload from current tagData
+  char hexColor[8];
+  snprintf(hexColor, sizeof(hexColor), "#%02X%02X%02X", tagData.r, tagData.g, tagData.b);
+  JsonDocument doc;
+  doc["protocol"]     = "openspool";
+  doc["brand"]        = tagData.manufacturer[0] ? tagData.manufacturer : "Generic";
+  doc["type"]         = tagData.material[0] ? tagData.material : "PLA";
+  doc["color_hex"]    = hexColor;
+  doc["min_temp"]     = tagData.extMin;
+  doc["max_temp"]     = tagData.extMax;
+  doc["bed_min_temp"] = tagData.bedMin;
+  doc["bed_max_temp"] = tagData.bedMax;
+  String payload;
+  serializeJson(doc, payload);
+  size_t payloadLen = payload.length();
+  // 2. Build NDEF MIME record: header, typeLen, payloadLen, type, payload
+  const char* mimeType = "application/json";
+  uint8_t typeLen = strlen(mimeType);
+  bool shortRecord = payloadLen < 256;
+  uint8_t ndef[512];
+  size_t n = 0;
+  ndef[n++] = shortRecord ? 0xD2 : 0xC2;   // TNF=2 (MIME), MB+ME+SR(if short)
+  ndef[n++] = typeLen;
+  if (shortRecord) {
+    ndef[n++] = (uint8_t)payloadLen;
+  } else {
+    ndef[n++] = (payloadLen >> 24) & 0xFF;
+    ndef[n++] = (payloadLen >> 16) & 0xFF;
+    ndef[n++] = (payloadLen >> 8)  & 0xFF;
+    ndef[n++] = payloadLen & 0xFF;
+  }
+  memcpy(ndef + n, mimeType, typeLen); n += typeLen;
+  memcpy(ndef + n, payload.c_str(), payloadLen); n += payloadLen;
+  // 3. Wrap in NDEF TLV: tag 0x03, length, ...ndef..., terminator 0xFE
+  uint8_t buf[520];
+  size_t offset = 0;
+  buf[offset++] = 0x03;
+  if (n < 255) {
+    buf[offset++] = (uint8_t)n;
+  } else {
+    buf[offset++] = 0xFF;
+    buf[offset++] = (n >> 8) & 0xFF;
+    buf[offset++] = n & 0xFF;
+  }
+  memcpy(buf + offset, ndef, n); offset += n;
+  buf[offset++] = 0xFE;   // terminator TLV
+  // 4. Pad to 4-byte page boundary, write sequentially from page 4
+  size_t totalPages = (offset + 3) / 4;
+  if (totalPages > 120) return false;   // won't fit (see openSpoolReadTag MAX_PAGES)
+  for (size_t p = 0; p < totalPages; p++) {
+    uint8_t page[4] = {0, 0, 0, 0};
+    size_t remaining = offset - (p * 4);
+    size_t copyLen = remaining < 4 ? remaining : 4;
+    memcpy(page, buf + (p * 4), copyLen);
+    if (!writeNfcPage(4 + p, page)) return false;
+    delay(5);
+  }
+  return true;
 }
 
 // ============================================================
@@ -524,24 +880,8 @@ void setup() {
 //  LOOP
 // ============================================================
 void loop() {
-  // Auto scan on Anycubic screen
-  if (nfcReady && currentScreen == SCR_ANYCUBIC &&
-      tagStatus != TAG_WRITE_OK && tagStatus != TAG_WRITE_FAIL) {
-    uint8_t uid[7];
-    uint8_t uidLen;
-    if (nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLen, 300)) {
-      memcpy(tagData.uid, uid, uidLen);
-      tagData.uidLen = uidLen;
-      if (aceReadTag()) {
-        tagStatus = TAG_READ;
-      } else {
-        tagData.hasData = false;
-        tagStatus = TAG_BLANK;
-      }
-      drawSubMenu("K-9 — Anycubic");
-    }
-  }
-// Auto scan on QIDI screen
+
+  // Auto scan on QIDI screen
   if (nfcReady && currentScreen == SCR_QIDI &&
       tagStatus != TAG_WRITE_OK && tagStatus != TAG_WRITE_FAIL) {
     uint8_t uid[7];
@@ -556,20 +896,20 @@ void loop() {
           uint8_t data[16] = {0};
           if (nfc.mifareclassic_ReadDataBlock(4, data)) {
             // data[0]=matID, data[1]=colID, data[2]=mfgID
-           uint8_t matCode = data[0];
-uint8_t colCode = data[1];
-uint8_t mfgCode = data[2];
-strncpy(tagData.manufacturer, qidiManufacturerName(mfgCode), sizeof(tagData.manufacturer));
-strncpy(tagData.material, qidiMaterialName(matCode), sizeof(tagData.material));
-if (colCode >= 1 && colCode <= 24) {
-  strncpy(tagData.color, QIDI_COLORS[colCode].name, sizeof(tagData.color));
-  tagData.r = QIDI_COLORS[colCode].r;
-  tagData.g = QIDI_COLORS[colCode].g;
-  tagData.b = QIDI_COLORS[colCode].b;
-} else {
-  strcpy(tagData.color, "Unknown");
-  tagData.r = tagData.g = tagData.b = 128;
-}
+            uint8_t matCode = data[0];
+            uint8_t colCode = data[1];
+            uint8_t mfgCode = data[2];
+            strncpy(tagData.manufacturer, qidiManufacturerName(mfgCode), sizeof(tagData.manufacturer));
+            strncpy(tagData.material, qidiMaterialName(matCode), sizeof(tagData.material));
+            if (colCode >= 1 && colCode <= 24) {
+              strncpy(tagData.color, QIDI_COLORS[colCode].name, sizeof(tagData.color));
+              tagData.r = QIDI_COLORS[colCode].r;
+              tagData.g = QIDI_COLORS[colCode].g;
+              tagData.b = QIDI_COLORS[colCode].b;
+            } else {
+              strcpy(tagData.color, "Unknown");
+              tagData.r = tagData.g = tagData.b = 128;
+            }
             tagData.extMin = 0; tagData.extMax = 0;
             tagData.bedMin = 0; tagData.bedMax = 0;
             tagData.hasData = true;
@@ -583,6 +923,43 @@ if (colCode >= 1 && colCode <= 24) {
       }
     }
   }
+
+  // Auto scan on Anycubic screen
+  if (nfcReady && currentScreen == SCR_ANYCUBIC &&
+      tagStatus != TAG_WRITE_OK && tagStatus != TAG_WRITE_FAIL) {
+    uint8_t uid[7];
+    uint8_t uidLen;
+    if (nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLen, 50)) {
+      memcpy(tagData.uid, uid, uidLen);
+      tagData.uidLen = uidLen;
+      if (aceReadTag()) {
+        tagStatus = TAG_READ;
+      } else {
+        tagData.hasData = false;
+        tagStatus = TAG_BLANK;
+      }
+      drawSubMenu("K-9 — Anycubic");
+    }
+  }
+
+  // Auto scan on OpenSpool screen
+  if (nfcReady && currentScreen == SCR_OPENSPOOL &&
+      tagStatus != TAG_WRITE_OK && tagStatus != TAG_WRITE_FAIL) {
+    uint8_t uid[7];
+    uint8_t uidLen;
+    if (nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLen, 50)) {
+      memcpy(tagData.uid, uid, uidLen);
+      tagData.uidLen = uidLen;
+      if (openSpoolReadTag()) {
+        tagStatus = TAG_READ;
+      } else {
+        tagData.hasData = false;
+        tagStatus = TAG_BLANK;
+      }
+      drawSubMenu("K-9 — OpenSpool U1");
+    }
+  }
+
   // Touch
   if (ts.tirqTouched() && ts.touched()) {
     TS_Point p = ts.getPoint();
@@ -635,6 +1012,11 @@ if (colCode >= 1 && colCode <= 24) {
           memset(&tagData, 0, sizeof(tagData));
           drawMain();
         }
+        else if (hit(115, 170, 90, 36, tx, ty) && currentScreen == SCR_OPENSPOOL && !tagData.hasData) {
+          // No tag read yet — go to manual entry instead of writing blindly
+          currentScreen = SCR_OPENSPOOL_ENTRY;
+          drawOpenSpoolEntry();
+        }
         else if (hit(115, 170, 90, 36, tx, ty)) {
           // Write
           if (!nfcReady) {
@@ -645,7 +1027,8 @@ if (colCode >= 1 && colCode <= 24) {
             drawFooter("Hold tag to write...", C_ORANGE);
             bool ok = false;
             if (currentScreen == SCR_ANYCUBIC) ok = aceWriteTag();
-            // QIDI and OpenSpool write coming soon
+            else if (currentScreen == SCR_OPENSPOOL) ok = openSpoolWriteTag();
+            // QIDI write coming soon
             tagStatus = ok ? TAG_WRITE_OK : TAG_WRITE_FAIL;
             drawSubMenu(title);
             delay(2000);
@@ -653,16 +1036,106 @@ if (colCode >= 1 && colCode <= 24) {
             drawSubMenu(title);
           }
         }
+       else if (hit(220, 170, 90, 36, tx, ty) && currentScreen == SCR_OPENSPOOL) {
+          // Read/verify what's actually on the tag
+          drawFooter("Hold tag to read...", C_ORANGE);
+          memset(&tagData, 0, sizeof(tagData));
+          uint8_t uid[7]; uint8_t uidLen;
+          if (nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLen, 1000)) {
+            memcpy(tagData.uid, uid, uidLen);
+            tagData.uidLen = uidLen;
+            if (openSpoolReadTag()) {
+              tagStatus = TAG_READ;
+            } else {
+              tagData.hasData = false;
+              tagStatus = TAG_BLANK;
+            }
+          } else {
+            drawFooter("No tag detected", C_RED);
+            delay(1000);
+          }
+          drawSubMenu(title);
+        }
         else if (hit(220, 170, 90, 36, tx, ty) && tagData.hasData) {
-          // Clear
+          // Clear (QIDI / Anycubic only)
           drawFooter("Clearing tag...", C_ORANGE);
           // Clear stub — to be implemented
           tagStatus = TAG_CLEAR_FAIL;
           drawSubMenu(title);
           delay(2000);
-          tagStatus = TAG_NONE;
+         tagStatus = TAG_NONE;
           memset(&tagData, 0, sizeof(tagData));
           drawSubMenu(title);
+        }
+        break;
+      }
+
+      case SCR_OPENSPOOL_ENTRY: {
+        // Manufacturer arrows
+        if (hit(10, 30, 26, 34, tx, ty)) {
+          osEntryMfgIdx = (osEntryMfgIdx == 0) ? OS_MANUFACTURERS_COUNT - 1 : osEntryMfgIdx - 1;
+          drawOpenSpoolEntry();
+        } else if (hit(W-36, 30, 26, 34, tx, ty)) {
+          osEntryMfgIdx = (osEntryMfgIdx + 1) % OS_MANUFACTURERS_COUNT;
+          drawOpenSpoolEntry();
+        }
+        // Material arrows — resets temps to material defaults
+        else if (hit(10, 68, 26, 34, tx, ty)) {
+          osEntryMatIdx = (osEntryMatIdx == 0) ? OS_MATERIALS_COUNT - 1 : osEntryMatIdx - 1;
+          osEntryNozMin = OS_MATERIALS[osEntryMatIdx].nozzleMin;
+          osEntryNozMax = OS_MATERIALS[osEntryMatIdx].nozzleMax;
+          osEntryBedMin = OS_MATERIALS[osEntryMatIdx].bedMin;
+          osEntryBedMax = OS_MATERIALS[osEntryMatIdx].bedMax;
+          drawOpenSpoolEntry();
+        } else if (hit(W-36, 68, 26, 34, tx, ty)) {
+          osEntryMatIdx = (osEntryMatIdx + 1) % OS_MATERIALS_COUNT;
+          osEntryNozMin = OS_MATERIALS[osEntryMatIdx].nozzleMin;
+          osEntryNozMax = OS_MATERIALS[osEntryMatIdx].nozzleMax;
+          osEntryBedMin = OS_MATERIALS[osEntryMatIdx].bedMin;
+          osEntryBedMax = OS_MATERIALS[osEntryMatIdx].bedMax;
+          drawOpenSpoolEntry();
+        }
+        // Color arrows (range 1..24)
+        else if (hit(10, 106, 26, 34, tx, ty)) {
+          osEntryColIdx = (osEntryColIdx <= 1) ? 24 : osEntryColIdx - 1;
+          drawOpenSpoolEntry();
+        } else if (hit(W-36, 106, 26, 34, tx, ty)) {
+          osEntryColIdx = (osEntryColIdx >= 24) ? 1 : osEntryColIdx + 1;
+          drawOpenSpoolEntry();
+        }
+        // Nozzle temp -/+
+        else if (hit(10, 144, 26, 26, tx, ty)) {
+          osEntryNozMin -= 5; osEntryNozMax -= 5;
+          drawOpenSpoolEntry();
+        } else if (hit(W-36, 144, 26, 26, tx, ty)) {
+          osEntryNozMin += 5; osEntryNozMax += 5;
+          drawOpenSpoolEntry();
+        }
+        // Back
+        else if (hit(10, 176, 90, 34, tx, ty)) {
+          currentScreen = SCR_OPENSPOOL;
+          drawSubMenu("K-9 — OpenSpool U1");
+        }
+        // Save -> populate tagData and write
+        else if (hit(115, 176, 90, 34, tx, ty)) {
+          strncpy(tagData.manufacturer, OS_MANUFACTURERS[osEntryMfgIdx], sizeof(tagData.manufacturer));
+          strncpy(tagData.material, OS_MATERIALS[osEntryMatIdx].name, sizeof(tagData.material));
+          strncpy(tagData.color, QIDI_COLORS[osEntryColIdx].name, sizeof(tagData.color));
+          tagData.r = QIDI_COLORS[osEntryColIdx].r;
+          tagData.g = QIDI_COLORS[osEntryColIdx].g;
+          tagData.b = QIDI_COLORS[osEntryColIdx].b;
+          tagData.extMin = osEntryNozMin; tagData.extMax = osEntryNozMax;
+          tagData.bedMin = osEntryBedMin; tagData.bedMax = osEntryBedMax;
+          tagData.hasData = true;
+
+          drawFooter("Hold tag to write...", C_ORANGE);
+          bool ok = openSpoolWriteTag();
+          tagStatus = ok ? TAG_WRITE_OK : TAG_WRITE_FAIL;
+          currentScreen = SCR_OPENSPOOL;
+          drawSubMenu("K-9 — OpenSpool U1");
+          delay(2000);
+          tagStatus = TAG_NONE;
+          drawSubMenu("K-9 — OpenSpool U1");
         }
         break;
       }
