@@ -245,6 +245,7 @@ int     osEntryBedMin = OS_MATERIALS[0].bedMin;
 int     osEntryBedMax = OS_MATERIALS[0].bedMax;
 int     osEntryNozMin = OS_MATERIALS[0].nozzleMin;
 int     osEntryNozMax = OS_MATERIALS[0].nozzleMax;
+bool    osEntryShowingRead = false;   // true = entry screen is showing a READ result instead of edit fields
 // ============================================================
 //  NFC HELPERS
 // ============================================================
@@ -272,6 +273,17 @@ bool writeNfcPage(uint8_t page, uint8_t* data) {
   for (uint8_t i = 0; i < 5; i++) {
     if (nfc.ntag2xx_WritePage(page, tmp)) return true;
     delay(20);
+  }
+  return false;
+}
+
+
+bool waitForTag(uint8_t* uid, uint8_t* uidLen, uint32_t timeoutMs) {
+  uint32_t start = millis();
+  while (millis() - start < timeoutMs) {
+    if (nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, uidLen, 100)) {
+      return true;
+    }
   }
   return false;
 }
@@ -473,9 +485,7 @@ void drawSubMenu(const char* title) {
 
   drawButton(10,  170, 90, 36, C_CARD,   "BACK",  C_TEXT);
   drawButton(115, 170, 90, 36, writeBg,  "WRITE", writeFg);
-if (currentScreen == SCR_OPENSPOOL) {
-    drawButton(220, 170, 90, 36, C_ORANGE_D, "READ", C_TEXT);
-  } else {
+if (currentScreen != SCR_OPENSPOOL) {
     drawButton(220, 170, 90, 36, clearBg,  "CLEAR", clearFg);
   }
 
@@ -489,67 +499,103 @@ void drawOpenSpoolEntry() {
   tft.fillScreen(C_BG);
   drawHeader("K-9 — Manual Entry");
 
-  // Manufacturer field
-  tft.fillRect(10, 30, W-20, 34, C_CARD);
-  tft.drawRect(10, 30, W-20, 34, C_ORANGE_D);
-  tft.setTextDatum(TL_DATUM);
-  tft.setTextColor(C_MUTED, C_CARD);
-  tft.drawString("MANUFACTURER", 44, 34, 1);
-  tft.setTextDatum(MC_DATUM);
-  tft.setTextColor(C_ORANGE, C_CARD);
-  tft.drawString(OS_MANUFACTURERS[osEntryMfgIdx], W/2, 52, 2);
-  drawButton(10, 30, 26, 34, C_ORANGE_D, "<", C_TEXT);
-  drawButton(W-36, 30, 26, 34, C_ORANGE_D, ">", C_TEXT);
+  if (osEntryShowingRead) {
+    // ---- Read-result view ----
+    tft.fillRect(10, 30, W-20, 140, C_CARD);
+    tft.drawRect(10, 30, W-20, 140, C_ORANGE_D);
+    if (!tagData.hasData) {
+      tft.setTextColor(C_MUTED, C_CARD);
+      tft.setTextDatum(MC_DATUM);
+      tft.drawString("Blank / unreadable tag", W/2, 100, 2);
+    } else {
+      tft.setTextDatum(TL_DATUM);
+      tft.setTextColor(C_MUTED, C_CARD);
+      tft.drawString("MANUFACTURER", 18, 36, 1);
+      tft.setTextColor(C_ORANGE, C_CARD);
+      tft.drawString(tagData.manufacturer[0] ? tagData.manufacturer : "--", 18, 48, 2);
 
-  // Material field
-  tft.fillRect(10, 68, W-20, 34, C_CARD);
-  tft.drawRect(10, 68, W-20, 34, C_ORANGE_D);
-  tft.setTextDatum(TL_DATUM);
-  tft.setTextColor(C_MUTED, C_CARD);
-  tft.drawString("MATERIAL", 44, 72, 1);
-  tft.setTextDatum(MC_DATUM);
-  tft.setTextColor(C_ORANGE, C_CARD);
-  tft.drawString(OS_MATERIALS[osEntryMatIdx].name, W/2, 90, 2);
-  drawButton(10, 68, 26, 34, C_ORANGE_D, "<", C_TEXT);
-  drawButton(W-36, 68, 26, 34, C_ORANGE_D, ">", C_TEXT);
+      tft.setTextColor(C_MUTED, C_CARD);
+      tft.drawString("MATERIAL", 170, 36, 1);
+      tft.setTextColor(C_ORANGE, C_CARD);
+      tft.drawString(tagData.material[0] ? tagData.material : "--", 170, 48, 2);
 
-  // Color field
-  tft.fillRect(10, 106, W-20, 34, C_CARD);
-  tft.drawRect(10, 106, W-20, 34, C_ORANGE_D);
-  tft.setTextDatum(TL_DATUM);
-  tft.setTextColor(C_MUTED, C_CARD);
-  tft.drawString("COLOR", 44, 110, 1);
-  tft.setTextDatum(MC_DATUM);
-  tft.setTextColor(C_ORANGE, C_CARD);
-  tft.drawString(QIDI_COLORS[osEntryColIdx].name, W/2, 128, 2);
-  uint16_t colorSw = tft.color565(QIDI_COLORS[osEntryColIdx].r,
-                                   QIDI_COLORS[osEntryColIdx].g,
-                                   QIDI_COLORS[osEntryColIdx].b);
-  tft.fillRect(W-46, 114, 20, 18, colorSw);
-  tft.drawRect(W-46, 114, 20, 18, C_ORANGE_D);
-  drawButton(10, 106, 26, 34, C_ORANGE_D, "<", C_TEXT);
-  drawButton(W-36, 106, 26, 34, C_ORANGE_D, ">", C_TEXT);
+      tft.setTextColor(C_MUTED, C_CARD);
+      tft.drawString("COLOR", 18, 72, 1);
+      uint16_t sw = tft.color565(tagData.r, tagData.g, tagData.b);
+      tft.fillRect(18, 82, 70, 18, sw);
+      tft.drawRect(18, 82, 70, 18, C_ORANGE_D);
+      tft.setTextColor(C_BLACK, sw);
+      tft.setTextDatum(MC_DATUM);
+      tft.drawString(tagData.color[0] ? tagData.color : "--", 53, 91, 1);
 
-  // Nozzle temp row
-  tft.fillRect(10, 144, W-20, 26, C_CARD);
-  tft.drawRect(10, 144, W-20, 26, C_ORANGE_D);
-  tft.setTextDatum(TL_DATUM);
-  tft.setTextColor(C_MUTED, C_CARD);
-  tft.drawString("NOZZLE", 44, 148, 1);
-  char buf[24];
-  snprintf(buf, sizeof(buf), "%d-%d C", osEntryNozMin, osEntryNozMax);
-  tft.setTextDatum(MC_DATUM);
-  tft.setTextColor(C_TEXT, C_CARD);
-  tft.drawString(buf, W/2, 157, 2);
-  drawButton(10, 144, 26, 26, C_ORANGE_D, "-", C_TEXT);
-  drawButton(W-36, 144, 26, 26, C_ORANGE_D, "+", C_TEXT);
+      tft.setTextDatum(TL_DATUM);
+      tft.setTextColor(C_MUTED, C_CARD);
+      tft.drawString("NOZZLE / BED", 170, 72, 1);
+      char buf[24];
+      snprintf(buf, sizeof(buf), "%d-%d C", tagData.extMin, tagData.extMax);
+      tft.setTextColor(C_TEXT, C_CARD);
+      tft.drawString(buf, 170, 84, 1);
+      snprintf(buf, sizeof(buf), "%d-%d C", tagData.bedMin, tagData.bedMax);
+      tft.drawString(buf, 170, 98, 1);
+
+      tft.setTextColor(C_GREEN, C_CARD);
+      tft.setTextDatum(MC_DATUM);
+      tft.drawString("READ FROM TAG", W/2, 130, 1);
+    }
+  } else {
+    // ---- Editable entry fields ----
+    auto field = [&](int y, const char* label, const char* value, uint16_t sw = 0xFFFF, bool showSwatch = false) {
+      tft.fillRect(10, y, W-20, 34, C_CARD);
+      tft.drawRect(10, y, W-20, 34, C_ORANGE_D);
+      tft.setTextDatum(TL_DATUM);
+      tft.setTextColor(C_MUTED, C_CARD);
+      tft.drawString(label, 44, y + 4, 1);
+      tft.setTextDatum(MC_DATUM);
+      tft.setTextColor(C_ORANGE, C_CARD);
+      tft.drawString(value, W/2, y + 22, 2);
+      if (showSwatch) {
+        tft.fillRect(W-46, y+8, 20, 18, sw);
+        tft.drawRect(W-46, y+8, 20, 18, C_ORANGE_D);
+      }
+      drawButton(10, y, 26, 34, C_ORANGE_D, "<", C_TEXT);
+      drawButton(W-36, y, 26, 34, C_ORANGE_D, ">", C_TEXT);
+    };
+
+    field(30, "MANUFACTURER", OS_MANUFACTURERS[osEntryMfgIdx]);
+    field(68, "MATERIAL", OS_MATERIALS[osEntryMatIdx].name);
+
+    uint16_t colorSw = tft.color565(QIDI_COLORS[osEntryColIdx].r,
+                                     QIDI_COLORS[osEntryColIdx].g,
+                                     QIDI_COLORS[osEntryColIdx].b);
+    field(106, "COLOR", QIDI_COLORS[osEntryColIdx].name, colorSw, true);
+
+    tft.fillRect(10, 144, W-20, 26, C_CARD);
+    tft.drawRect(10, 144, W-20, 26, C_ORANGE_D);
+    tft.setTextDatum(TL_DATUM);
+    tft.setTextColor(C_MUTED, C_CARD);
+    tft.drawString("NOZZLE", 44, 148, 1);
+    char buf[24];
+    snprintf(buf, sizeof(buf), "%d-%d C", osEntryNozMin, osEntryNozMax);
+    tft.setTextDatum(MC_DATUM);
+    tft.setTextColor(C_TEXT, C_CARD);
+    tft.drawString(buf, W/2, 157, 2);
+    drawButton(10, 144, 26, 26, C_ORANGE_D, "-", C_TEXT);
+    drawButton(W-36, 144, 26, 26, C_ORANGE_D, "+", C_TEXT);
+  }
 
   drawFooter("K-9  mark 1  -  Built by Joe the Builder", C_MUTED);
 
-  drawButton(10,  176, 90, 34, C_CARD,   "BACK", C_TEXT);
-  drawButton(115, 176, 90, 34, C_ORANGE, "SAVE", C_BLACK);
+  uint16_t saveBg = C_ORANGE;
+  uint16_t saveFg = C_BLACK;
+  if (tagStatus == TAG_WRITE_OK)   { saveBg = C_GREEN; saveFg = C_BLACK; }
+  if (tagStatus == TAG_WRITE_FAIL) { saveBg = C_RED;   saveFg = C_WHITE; }
+
+  drawButton(10,  176, 90, 34, C_CARD,     "BACK", C_TEXT);
+  drawButton(115, 176, 90, 34, saveBg,     "SAVE", saveFg);
+  drawButton(220, 176, 90, 34, C_ORANGE_D, "READ", C_TEXT);
 }
 
+  
 // ============================================================
 //  NO READER SCREEN
 // ============================================================
@@ -947,7 +993,7 @@ void loop() {
       tagStatus != TAG_WRITE_OK && tagStatus != TAG_WRITE_FAIL) {
     uint8_t uid[7];
     uint8_t uidLen;
-    if (nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLen, 50)) {
+    if (nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLen, 150)) {
       memcpy(tagData.uid, uid, uidLen);
       tagData.uidLen = uidLen;
       if (openSpoolReadTag()) {
@@ -1012,12 +1058,13 @@ void loop() {
           memset(&tagData, 0, sizeof(tagData));
           drawMain();
         }
-        else if (hit(115, 170, 90, 36, tx, ty) && currentScreen == SCR_OPENSPOOL && !tagData.hasData) {
-          // No tag read yet — go to manual entry instead of writing blindly
+else if (hit(115, 170, 90, 36, tx, ty) && currentScreen == SCR_OPENSPOOL) {
+          // Always go to manual entry — never write blind, even if
+          // auto-scan already populated tagData in the background
           currentScreen = SCR_OPENSPOOL_ENTRY;
           drawOpenSpoolEntry();
-        }
-        else if (hit(115, 170, 90, 36, tx, ty)) {
+        }          
+          else if (hit(115, 170, 90, 36, tx, ty)) {
           // Write
           if (!nfcReady) {
             drawFooter("No reader connected!", C_RED);
@@ -1036,26 +1083,7 @@ void loop() {
             drawSubMenu(title);
           }
         }
-       else if (hit(220, 170, 90, 36, tx, ty) && currentScreen == SCR_OPENSPOOL) {
-          // Read/verify what's actually on the tag
-          drawFooter("Hold tag to read...", C_ORANGE);
-          memset(&tagData, 0, sizeof(tagData));
-          uint8_t uid[7]; uint8_t uidLen;
-          if (nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLen, 1000)) {
-            memcpy(tagData.uid, uid, uidLen);
-            tagData.uidLen = uidLen;
-            if (openSpoolReadTag()) {
-              tagStatus = TAG_READ;
-            } else {
-              tagData.hasData = false;
-              tagStatus = TAG_BLANK;
-            }
-          } else {
-            drawFooter("No tag detected", C_RED);
-            delay(1000);
-          }
-          drawSubMenu(title);
-        }
+       
         else if (hit(220, 170, 90, 36, tx, ty) && tagData.hasData) {
           // Clear (QIDI / Anycubic only)
           drawFooter("Clearing tag...", C_ORANGE);
@@ -1071,16 +1099,17 @@ void loop() {
       }
 
       case SCR_OPENSPOOL_ENTRY: {
-        // Manufacturer arrows
         if (hit(10, 30, 26, 34, tx, ty)) {
+          osEntryShowingRead = false;
           osEntryMfgIdx = (osEntryMfgIdx == 0) ? OS_MANUFACTURERS_COUNT - 1 : osEntryMfgIdx - 1;
           drawOpenSpoolEntry();
         } else if (hit(W-36, 30, 26, 34, tx, ty)) {
+          osEntryShowingRead = false;
           osEntryMfgIdx = (osEntryMfgIdx + 1) % OS_MANUFACTURERS_COUNT;
           drawOpenSpoolEntry();
         }
-        // Material arrows — resets temps to material defaults
         else if (hit(10, 68, 26, 34, tx, ty)) {
+          osEntryShowingRead = false;
           osEntryMatIdx = (osEntryMatIdx == 0) ? OS_MATERIALS_COUNT - 1 : osEntryMatIdx - 1;
           osEntryNozMin = OS_MATERIALS[osEntryMatIdx].nozzleMin;
           osEntryNozMax = OS_MATERIALS[osEntryMatIdx].nozzleMax;
@@ -1088,6 +1117,7 @@ void loop() {
           osEntryBedMax = OS_MATERIALS[osEntryMatIdx].bedMax;
           drawOpenSpoolEntry();
         } else if (hit(W-36, 68, 26, 34, tx, ty)) {
+          osEntryShowingRead = false;
           osEntryMatIdx = (osEntryMatIdx + 1) % OS_MATERIALS_COUNT;
           osEntryNozMin = OS_MATERIALS[osEntryMatIdx].nozzleMin;
           osEntryNozMax = OS_MATERIALS[osEntryMatIdx].nozzleMax;
@@ -1095,29 +1125,33 @@ void loop() {
           osEntryBedMax = OS_MATERIALS[osEntryMatIdx].bedMax;
           drawOpenSpoolEntry();
         }
-        // Color arrows (range 1..24)
         else if (hit(10, 106, 26, 34, tx, ty)) {
+          osEntryShowingRead = false;
           osEntryColIdx = (osEntryColIdx <= 1) ? 24 : osEntryColIdx - 1;
           drawOpenSpoolEntry();
         } else if (hit(W-36, 106, 26, 34, tx, ty)) {
+          osEntryShowingRead = false;
           osEntryColIdx = (osEntryColIdx >= 24) ? 1 : osEntryColIdx + 1;
           drawOpenSpoolEntry();
         }
-        // Nozzle temp -/+
         else if (hit(10, 144, 26, 26, tx, ty)) {
+          osEntryShowingRead = false;
           osEntryNozMin -= 5; osEntryNozMax -= 5;
           drawOpenSpoolEntry();
         } else if (hit(W-36, 144, 26, 26, tx, ty)) {
+          osEntryShowingRead = false;
           osEntryNozMin += 5; osEntryNozMax += 5;
           drawOpenSpoolEntry();
         }
         // Back
         else if (hit(10, 176, 90, 34, tx, ty)) {
+          osEntryShowingRead = false;
           currentScreen = SCR_OPENSPOOL;
           drawSubMenu("K-9 — OpenSpool U1");
         }
-        // Save -> populate tagData and write
+        // Save
         else if (hit(115, 176, 90, 34, tx, ty)) {
+          osEntryShowingRead = false;
           strncpy(tagData.manufacturer, OS_MANUFACTURERS[osEntryMfgIdx], sizeof(tagData.manufacturer));
           strncpy(tagData.material, OS_MATERIALS[osEntryMatIdx].name, sizeof(tagData.material));
           strncpy(tagData.color, QIDI_COLORS[osEntryColIdx].name, sizeof(tagData.color));
@@ -1128,18 +1162,46 @@ void loop() {
           tagData.bedMin = osEntryBedMin; tagData.bedMax = osEntryBedMax;
           tagData.hasData = true;
 
-          drawFooter("Hold tag to write...", C_ORANGE);
-          bool ok = openSpoolWriteTag();
+          drawFooter("Hold tag near reader...", C_ORANGE);
+          uint8_t uid[7]; uint8_t uidLen;
+          bool ok = false;
+          if (waitForTag(uid, &uidLen, 5000)) {
+            drawFooter("Tag found — hold steady...", C_ORANGE);
+            delay(450);
+            drawFooter("Writing...", C_ORANGE);
+            ok = openSpoolWriteTag();
+          }
           tagStatus = ok ? TAG_WRITE_OK : TAG_WRITE_FAIL;
-          currentScreen = SCR_OPENSPOOL;
-          drawSubMenu("K-9 — OpenSpool U1");
-          delay(2000);
+          drawOpenSpoolEntry();
+          delay(1500);
           tagStatus = TAG_NONE;
-          drawSubMenu("K-9 — OpenSpool U1");
+          drawOpenSpoolEntry();
+        }
+        // Read (manual verify, stays on this screen)
+        else if (hit(220, 176, 90, 34, tx, ty)) {
+          drawFooter("Hold tag to read...", C_ORANGE);
+          uint8_t uid[7]; uint8_t uidLen;
+          if (waitForTag(uid, &uidLen, 5000)) {
+            drawFooter("Tag found — reading...", C_ORANGE);
+            delay(450);
+            memcpy(tagData.uid, uid, uidLen);
+            tagData.uidLen = uidLen;
+            if (openSpoolReadTag()) {
+              tagStatus = TAG_READ;
+            } else {
+              tagData.hasData = false;
+              tagStatus = TAG_BLANK;
+            }
+            osEntryShowingRead = true;
+          } else {
+            drawFooter("No tag detected", C_RED);
+            delay(1200);
+            osEntryShowingRead = false;
+          }
+          drawOpenSpoolEntry();
         }
         break;
       }
-
       default:
         break;
     }
