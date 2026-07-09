@@ -20,6 +20,14 @@
 #include <Adafruit_PN532.h>
 #include <ArduinoJson.h>
 
+// Compatibility with newer ESP32 board packages (core 3.x) that dropped these
+#ifndef VSPI
+#define VSPI 2
+#endif
+#ifndef HSPI
+#define HSPI 1
+#endif
+
 // ── Display ─────────────────────────────────────────────────
 TFT_eSPI tft = TFT_eSPI();
 int W, H;
@@ -59,6 +67,7 @@ enum Screen {
   SCR_SPLASH,
   SCR_MAIN,
   SCR_QIDI,
+   SCR_QIDI_ENTRY,
   SCR_OPENSPOOL,
   SCR_OPENSPOOL_ENTRY,
   SCR_ANYCUBIC,
@@ -149,6 +158,11 @@ const char* qidiMaterialName(uint8_t code) {
     default: return "Unknown";
   }
 }
+const uint8_t QIDI_MATERIAL_CODES[] = {
+  1, 2, 3, 4, 5, 6, 7, 8, 11, 12, 13, 14, 18, 19, 24, 25, 26, 27,
+  30, 31, 32, 33, 34, 37, 38, 39, 40, 41, 42, 43, 44, 45, 47, 49, 50
+};
+const uint8_t QIDI_MATERIAL_COUNT = sizeof(QIDI_MATERIAL_CODES) / sizeof(QIDI_MATERIAL_CODES[0]);
 
 const char* qidiManufacturerName(uint8_t code) {
   switch(code) {
@@ -255,6 +269,11 @@ int     aceEntryBedMax = OS_MATERIALS[0].bedMax;
 int     aceEntryNozMin = OS_MATERIALS[0].nozzleMin;
 int     aceEntryNozMax = OS_MATERIALS[0].nozzleMax;
 bool    aceEntryShowingRead = false;
+uint8_t qidiEntryMatCodeIdx = 0;   // index into QIDI_MATERIAL_CODES
+uint8_t qidiEntryMfgCode = 0;      // 0=Generic, 1=QIDI
+uint8_t qidiEntryColIdx = 1;       // index into QIDI_COLORS (1..24)
+bool    qidiEntryShowingRead = false;
+bool    qidiTagPresent = false;    // tracks whether a tag is currently on the reader (SCR_QIDI screen)
 // ============================================================
 //  NFC HELPERS
 // ============================================================
@@ -703,6 +722,83 @@ void drawAnycubicEntry() {
   drawButton(115, 176, 90, 34, saveBg,     "SAVE", saveFg);
   drawButton(220, 176, 90, 34, C_ORANGE_D, "READ", C_TEXT);
 }
+// ============================================================
+//  QIDI MANUAL ENTRY SCREEN
+// ============================================================
+void drawQidiEntry() {
+  tft.fillScreen(C_BG);
+  drawHeader("K-9 — QIDI Entry");
+
+  if (qidiEntryShowingRead) {
+    tft.fillRect(10, 30, W-20, 140, C_CARD);
+    tft.drawRect(10, 30, W-20, 140, C_ORANGE_D);
+    if (!tagData.hasData) {
+      tft.setTextColor(C_MUTED, C_CARD);
+      tft.setTextDatum(MC_DATUM);
+      tft.drawString("Blank / unreadable tag", W/2, 100, 2);
+    } else {
+      tft.setTextDatum(TL_DATUM);
+      tft.setTextColor(C_MUTED, C_CARD);
+      tft.drawString("MANUFACTURER", 18, 40, 1);
+      tft.setTextColor(C_ORANGE, C_CARD);
+      tft.drawString(tagData.manufacturer[0] ? tagData.manufacturer : "--", 18, 52, 2);
+
+      tft.setTextColor(C_MUTED, C_CARD);
+      tft.drawString("MATERIAL", 18, 80, 1);
+      tft.setTextColor(C_ORANGE, C_CARD);
+      tft.drawString(tagData.material[0] ? tagData.material : "--", 18, 92, 2);
+
+      tft.setTextColor(C_MUTED, C_CARD);
+      tft.drawString("COLOR", 18, 120, 1);
+      uint16_t sw = tft.color565(tagData.r, tagData.g, tagData.b);
+      tft.fillRect(18, 132, 70, 18, sw);
+      tft.drawRect(18, 132, 70, 18, C_ORANGE_D);
+      tft.setTextColor(C_BLACK, sw);
+      tft.setTextDatum(MC_DATUM);
+      tft.drawString(tagData.color[0] ? tagData.color : "--", 53, 141, 1);
+
+      tft.setTextColor(C_GREEN, C_CARD);
+      tft.setTextDatum(MC_DATUM);
+      tft.drawString("READ FROM TAG", W/2, 160, 1);
+    }
+  } else {
+    auto field = [&](int y, const char* label, const char* value, uint16_t sw = 0xFFFF, bool showSwatch = false) {
+      tft.fillRect(10, y, W-20, 34, C_CARD);
+      tft.drawRect(10, y, W-20, 34, C_ORANGE_D);
+      tft.setTextDatum(TL_DATUM);
+      tft.setTextColor(C_MUTED, C_CARD);
+      tft.drawString(label, 44, y + 4, 1);
+      tft.setTextDatum(MC_DATUM);
+      tft.setTextColor(C_ORANGE, C_CARD);
+      tft.drawString(value, W/2, y + 22, 2);
+      if (showSwatch) {
+        tft.fillRect(W-46, y+8, 20, 18, sw);
+        tft.drawRect(W-46, y+8, 20, 18, C_ORANGE_D);
+      }
+      drawButton(10, y, 26, 34, C_ORANGE_D, "<", C_TEXT);
+      drawButton(W-36, y, 26, 34, C_ORANGE_D, ">", C_TEXT);
+    };
+
+    field(30, "MANUFACTURER", qidiManufacturerName(qidiEntryMfgCode));
+    field(78, "MATERIAL", qidiMaterialName(QIDI_MATERIAL_CODES[qidiEntryMatCodeIdx]));
+
+    uint16_t colorSw = tft.color565(QIDI_COLORS[qidiEntryColIdx].r,
+                                     QIDI_COLORS[qidiEntryColIdx].g,
+                                     QIDI_COLORS[qidiEntryColIdx].b);
+    field(126, "COLOR", QIDI_COLORS[qidiEntryColIdx].name, colorSw, true);
+  }
+
+  drawFooter("K-9  mark 1  -  Built by Joe the Builder", C_MUTED);
+
+  uint16_t saveBg = C_ORANGE;
+  uint16_t saveFg = C_BLACK;
+  if (tagStatus == TAG_WRITE_OK)   { saveBg = C_GREEN; saveFg = C_BLACK; }
+  if (tagStatus == TAG_WRITE_FAIL) { saveBg = C_RED;   saveFg = C_WHITE; }
+
+  drawButton(10,  176, 90, 34, C_CARD,     "BACK", C_TEXT);
+  drawButton(115, 176, 90, 34, saveBg,     "SAVE", saveFg);
+  drawButton(220, 176, 90, 34, C_ORANGE_D, "READ", C_TEXT);
+}
   
 // ============================================================
 //  NO READER SCREEN
@@ -798,6 +894,21 @@ bool aceWriteTag() {
   if (!writeNfcPage(29, page)) return false;
 
   return true;
+}
+bool qidiWriteTag() {
+  uint8_t uid[7]; uint8_t uidLen;
+  if (!waitForTag(uid, &uidLen, 5000)) return false;
+  if (uidLen != 4) return false;   // must be Mifare Classic
+
+  uint8_t keya[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+  if (!nfc.mifareclassic_AuthenticateBlock(uid, uidLen, 4, 0, keya)) return false;
+
+  uint8_t data[16] = {0};
+  data[0] = QIDI_MATERIAL_CODES[qidiEntryMatCodeIdx];
+  data[1] = qidiEntryColIdx;
+  data[2] = qidiEntryMfgCode;
+
+  return nfc.mifareclassic_WriteDataBlock(4, data);
 }
 // ============================================================
 //  OPENSPOOL TAG READ
@@ -960,6 +1071,9 @@ bool openSpoolReadTag() {
 //  OPENSPOOL TAG WRITE
 // ============================================================
 bool openSpoolWriteTag() {
+  uint8_t uid[7]; uint8_t uidLen;
+  if (!waitForTag(uid, &uidLen, 5000)) return false;
+
   if (!ensureOpenSpoolCC()) return false;
 
   // 1. Build JSON payload from current tagData
@@ -1071,11 +1185,18 @@ void setup() {
 void loop() {
 
   // Auto scan on QIDI screen
-  if (nfcReady && currentScreen == SCR_QIDI &&
-      tagStatus != TAG_WRITE_OK && tagStatus != TAG_WRITE_FAIL) {
+  // Tracks tag presence (qidiTagPresent) so it: (1) reads once per tag placement
+  // instead of flooding drawSubMenu() every loop while a tag sits still (the old
+  // BACK/WRITE freeze bug), AND (2) detects when the tag is lifted off and a new
+  // one is placed, so it doesn't get stuck only ever reading the first tag.
+  if (nfcReady && currentScreen == SCR_QIDI) {
     uint8_t uid[7];
     uint8_t uidLen;
-    if (nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLen, 300)) {
+    bool found = nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLen, 100);
+
+    if (found && !qidiTagPresent) {
+      // New tag just placed — read it once
+      qidiTagPresent = true;
       memcpy(tagData.uid, uid, uidLen);
       tagData.uidLen = uidLen;
       if (uidLen == 4) {
@@ -1110,7 +1231,15 @@ void loop() {
         }
         drawSubMenu("K-9 — QIDI");
       }
+    } else if (!found && qidiTagPresent) {
+      // Tag was lifted off — reset so the next tag placed gets read
+      qidiTagPresent = false;
+      tagStatus = TAG_NONE;
+      tagData.hasData = false;
+      drawSubMenu("K-9 — QIDI");
     }
+    // else: tag still resting there (found && qidiTagPresent) or still absent
+    // (!found && !qidiTagPresent) — do nothing, no redraw, no reprocessing.
   }
 
   // Auto scan on Anycubic screen
@@ -1166,6 +1295,7 @@ void loop() {
         if (hit(10, 40,  300, 42, tx, ty)) {
           currentScreen = SCR_QIDI;
           tagStatus = TAG_NONE;
+          qidiTagPresent = false;
           memset(&tagData, 0, sizeof(tagData));
           drawSubMenu("K-9 — QIDI");
         }
@@ -1186,8 +1316,7 @@ void loop() {
           // Settings screen coming soon-do nothng
         }
         break;
-
-      case SCR_QIDI:
+case SCR_QIDI:
       case SCR_OPENSPOOL:
       case SCR_ANYCUBIC: {
         const char* title =
@@ -1198,17 +1327,11 @@ void loop() {
           // Back
           currentScreen = SCR_MAIN;
           tagStatus = TAG_NONE;
+          qidiTagPresent = false;
           memset(&tagData, 0, sizeof(tagData));
           drawMain();
         }
-else if (hit(115, 170, 90, 36, tx, ty) && currentScreen == SCR_OPENSPOOL) {
-          // Always go to manual entry — never write blind, even if
-          // auto-scan already populated tagData in the background
-          currentScreen = SCR_OPENSPOOL_ENTRY;
-          drawOpenSpoolEntry();
-          
-        }          
-       else if (hit(115, 170, 90, 36, tx, ty) && currentScreen == SCR_OPENSPOOL) {
+        else if (hit(115, 170, 90, 36, tx, ty) && currentScreen == SCR_OPENSPOOL) {
           currentScreen = SCR_OPENSPOOL_ENTRY;
           drawOpenSpoolEntry();
         }
@@ -1216,143 +1339,24 @@ else if (hit(115, 170, 90, 36, tx, ty) && currentScreen == SCR_OPENSPOOL) {
           currentScreen = SCR_ANYCUBIC_ENTRY;
           drawAnycubicEntry();
         }
-        else if (hit(115, 170, 90, 36, tx, ty)) {
-          // Write (QIDI only for now)
-          if (!nfcReady) {
-            drawFooter("No reader connected!", C_RED);
-            delay(1500);
-            drawSubMenu(title);
-          } else {
-            drawFooter("Hold tag to write...", C_ORANGE);
-            bool ok = false;
-            // QIDI write coming soon
-            tagStatus = ok ? TAG_WRITE_OK : TAG_WRITE_FAIL;
-            drawSubMenu(title);
-            delay(2000);
-            tagStatus = TAG_NONE;
-            drawSubMenu(title);
-          }
+        else if (hit(115, 170, 90, 36, tx, ty) && currentScreen == SCR_QIDI) {
+          currentScreen = SCR_QIDI_ENTRY;
+          drawQidiEntry();
         }
-       
         else if (hit(220, 170, 90, 36, tx, ty) && tagData.hasData) {
-          // Clear (QIDI / Anycubic only)
+          // Clear (leftover stub, no longer used by OpenSpool/Anycubic/QIDI
+          // since they all have their own entry screens now)
           drawFooter("Clearing tag...", C_ORANGE);
-          // Clear stub — to be implemented
           tagStatus = TAG_CLEAR_FAIL;
           drawSubMenu(title);
           delay(2000);
-         tagStatus = TAG_NONE;
+          tagStatus = TAG_NONE;
           memset(&tagData, 0, sizeof(tagData));
           drawSubMenu(title);
         }
         break;
       }
-
-      case SCR_OPENSPOOL_ENTRY: {
-        if (hit(10, 30, 26, 34, tx, ty)) {
-          osEntryShowingRead = false;
-          osEntryMfgIdx = (osEntryMfgIdx == 0) ? OS_MANUFACTURERS_COUNT - 1 : osEntryMfgIdx - 1;
-          drawOpenSpoolEntry();
-        } else if (hit(W-36, 30, 26, 34, tx, ty)) {
-          osEntryShowingRead = false;
-          osEntryMfgIdx = (osEntryMfgIdx + 1) % OS_MANUFACTURERS_COUNT;
-          drawOpenSpoolEntry();
-        }
-        else if (hit(10, 68, 26, 34, tx, ty)) {
-          osEntryShowingRead = false;
-          osEntryMatIdx = (osEntryMatIdx == 0) ? OS_MATERIALS_COUNT - 1 : osEntryMatIdx - 1;
-          osEntryNozMin = OS_MATERIALS[osEntryMatIdx].nozzleMin;
-          osEntryNozMax = OS_MATERIALS[osEntryMatIdx].nozzleMax;
-          osEntryBedMin = OS_MATERIALS[osEntryMatIdx].bedMin;
-          osEntryBedMax = OS_MATERIALS[osEntryMatIdx].bedMax;
-          drawOpenSpoolEntry();
-        } else if (hit(W-36, 68, 26, 34, tx, ty)) {
-          osEntryShowingRead = false;
-          osEntryMatIdx = (osEntryMatIdx + 1) % OS_MATERIALS_COUNT;
-          osEntryNozMin = OS_MATERIALS[osEntryMatIdx].nozzleMin;
-          osEntryNozMax = OS_MATERIALS[osEntryMatIdx].nozzleMax;
-          osEntryBedMin = OS_MATERIALS[osEntryMatIdx].bedMin;
-          osEntryBedMax = OS_MATERIALS[osEntryMatIdx].bedMax;
-          drawOpenSpoolEntry();
-        }
-        else if (hit(10, 106, 26, 34, tx, ty)) {
-          osEntryShowingRead = false;
-          osEntryColIdx = (osEntryColIdx <= 1) ? 24 : osEntryColIdx - 1;
-          drawOpenSpoolEntry();
-        } else if (hit(W-36, 106, 26, 34, tx, ty)) {
-          osEntryShowingRead = false;
-          osEntryColIdx = (osEntryColIdx >= 24) ? 1 : osEntryColIdx + 1;
-          drawOpenSpoolEntry();
-        }
-        else if (hit(10, 144, 26, 26, tx, ty)) {
-          osEntryShowingRead = false;
-          osEntryNozMin -= 5; osEntryNozMax -= 5;
-          drawOpenSpoolEntry();
-        } else if (hit(W-36, 144, 26, 26, tx, ty)) {
-          osEntryShowingRead = false;
-          osEntryNozMin += 5; osEntryNozMax += 5;
-          drawOpenSpoolEntry();
-        }
-        // Back
-        else if (hit(10, 176, 90, 34, tx, ty)) {
-          osEntryShowingRead = false;
-          currentScreen = SCR_OPENSPOOL;
-          drawSubMenu("K-9 — OpenSpool U1");
-        }
-        // Save
-        else if (hit(115, 176, 90, 34, tx, ty)) {
-          osEntryShowingRead = false;
-          strncpy(tagData.manufacturer, OS_MANUFACTURERS[osEntryMfgIdx], sizeof(tagData.manufacturer));
-          strncpy(tagData.material, OS_MATERIALS[osEntryMatIdx].name, sizeof(tagData.material));
-          strncpy(tagData.color, QIDI_COLORS[osEntryColIdx].name, sizeof(tagData.color));
-          tagData.r = QIDI_COLORS[osEntryColIdx].r;
-          tagData.g = QIDI_COLORS[osEntryColIdx].g;
-          tagData.b = QIDI_COLORS[osEntryColIdx].b;
-          tagData.extMin = osEntryNozMin; tagData.extMax = osEntryNozMax;
-          tagData.bedMin = osEntryBedMin; tagData.bedMax = osEntryBedMax;
-          tagData.hasData = true;
-
-          drawFooter("Hold tag near reader...", C_ORANGE);
-          uint8_t uid[7]; uint8_t uidLen;
-          bool ok = false;
-          if (waitForTag(uid, &uidLen, 5000)) {
-            drawFooter("Tag found — hold steady...", C_ORANGE);
-            delay(450);
-            drawFooter("Writing...", C_ORANGE);
-            ok = openSpoolWriteTag();
-          }
-          tagStatus = ok ? TAG_WRITE_OK : TAG_WRITE_FAIL;
-          drawOpenSpoolEntry();
-          delay(1500);
-          tagStatus = TAG_NONE;
-          drawOpenSpoolEntry();
-        }
-        // Read (manual verify, stays on this screen)
-        else if (hit(220, 176, 90, 34, tx, ty)) {
-          drawFooter("Hold tag to read...", C_ORANGE);
-          uint8_t uid[7]; uint8_t uidLen;
-          if (waitForTag(uid, &uidLen, 5000)) {
-            drawFooter("Tag found — reading...", C_ORANGE);
-            delay(450);
-            memcpy(tagData.uid, uid, uidLen);
-            tagData.uidLen = uidLen;
-            if (openSpoolReadTag()) {
-              tagStatus = TAG_READ;
-            } else {
-              tagData.hasData = false;
-              tagStatus = TAG_BLANK;
-            }
-            osEntryShowingRead = true;
-          } else {
-            drawFooter("No tag detected", C_RED);
-            delay(1200);
-            osEntryShowingRead = false;
-          }
-          drawOpenSpoolEntry();
-        }
-        break;
-      }
-      case SCR_ANYCUBIC_ENTRY: {
+         case SCR_ANYCUBIC_ENTRY: {
         if (hit(10, 30, 26, 34, tx, ty)) {
           aceEntryShowingRead = false;
           aceEntryMfgIdx = (aceEntryMfgIdx == 0) ? OS_MANUFACTURERS_COUNT - 1 : aceEntryMfgIdx - 1;
@@ -1443,6 +1447,206 @@ else if (hit(115, 170, 90, 36, tx, ty) && currentScreen == SCR_OPENSPOOL) {
             aceEntryShowingRead = false;
           }
           drawAnycubicEntry();
+        }
+        break;
+      }
+      case SCR_OPENSPOOL_ENTRY: {
+        if (hit(10, 30, 26, 34, tx, ty)) {
+          osEntryShowingRead = false;
+          osEntryMfgIdx = (osEntryMfgIdx == 0) ? OS_MANUFACTURERS_COUNT - 1 : osEntryMfgIdx - 1;
+          drawOpenSpoolEntry();
+        } else if (hit(W-36, 30, 26, 34, tx, ty)) {
+          osEntryShowingRead = false;
+          osEntryMfgIdx = (osEntryMfgIdx + 1) % OS_MANUFACTURERS_COUNT;
+          drawOpenSpoolEntry();
+        }
+        else if (hit(10, 68, 26, 34, tx, ty)) {
+          osEntryShowingRead = false;
+          osEntryMatIdx = (osEntryMatIdx == 0) ? OS_MATERIALS_COUNT - 1 : osEntryMatIdx - 1;
+          osEntryNozMin = OS_MATERIALS[osEntryMatIdx].nozzleMin;
+          osEntryNozMax = OS_MATERIALS[osEntryMatIdx].nozzleMax;
+          osEntryBedMin = OS_MATERIALS[osEntryMatIdx].bedMin;
+          osEntryBedMax = OS_MATERIALS[osEntryMatIdx].bedMax;
+          drawOpenSpoolEntry();
+        } else if (hit(W-36, 68, 26, 34, tx, ty)) {
+          osEntryShowingRead = false;
+          osEntryMatIdx = (osEntryMatIdx + 1) % OS_MATERIALS_COUNT;
+          osEntryNozMin = OS_MATERIALS[osEntryMatIdx].nozzleMin;
+          osEntryNozMax = OS_MATERIALS[osEntryMatIdx].nozzleMax;
+          osEntryBedMin = OS_MATERIALS[osEntryMatIdx].bedMin;
+          osEntryBedMax = OS_MATERIALS[osEntryMatIdx].bedMax;
+          drawOpenSpoolEntry();
+        }
+        else if (hit(10, 106, 26, 34, tx, ty)) {
+          osEntryShowingRead = false;
+          osEntryColIdx = (osEntryColIdx <= 1) ? 24 : osEntryColIdx - 1;
+          drawOpenSpoolEntry();
+        } else if (hit(W-36, 106, 26, 34, tx, ty)) {
+          osEntryShowingRead = false;
+          osEntryColIdx = (osEntryColIdx >= 24) ? 1 : osEntryColIdx + 1;
+          drawOpenSpoolEntry();
+        }
+        else if (hit(10, 144, 26, 26, tx, ty)) {
+          osEntryShowingRead = false;
+          osEntryNozMin -= 5; osEntryNozMax -= 5;
+          drawOpenSpoolEntry();
+        } else if (hit(W-36, 144, 26, 26, tx, ty)) {
+          osEntryShowingRead = false;
+          osEntryNozMin += 5; osEntryNozMax += 5;
+          drawOpenSpoolEntry();
+        }
+        else if (hit(10, 176, 90, 34, tx, ty)) {
+          osEntryShowingRead = false;
+          currentScreen = SCR_OPENSPOOL;
+          drawSubMenu("K-9 — OpenSpool U1");
+        }
+        else if (hit(115, 176, 90, 34, tx, ty)) {
+          osEntryShowingRead = false;
+          strncpy(tagData.manufacturer, OS_MANUFACTURERS[osEntryMfgIdx], sizeof(tagData.manufacturer));
+          strncpy(tagData.material, OS_MATERIALS[osEntryMatIdx].name, sizeof(tagData.material));
+          strncpy(tagData.color, QIDI_COLORS[osEntryColIdx].name, sizeof(tagData.color));
+          tagData.r = QIDI_COLORS[osEntryColIdx].r;
+          tagData.g = QIDI_COLORS[osEntryColIdx].g;
+          tagData.b = QIDI_COLORS[osEntryColIdx].b;
+          tagData.extMin = osEntryNozMin; tagData.extMax = osEntryNozMax;
+          tagData.bedMin = osEntryBedMin; tagData.bedMax = osEntryBedMax;
+          tagData.hasData = true;
+
+          drawFooter("Hold tag near reader...", C_ORANGE);
+          bool ok = openSpoolWriteTag();
+          tagStatus = ok ? TAG_WRITE_OK : TAG_WRITE_FAIL;
+          drawOpenSpoolEntry();
+          delay(1500);
+          tagStatus = TAG_NONE;
+          drawOpenSpoolEntry();
+        }
+        else if (hit(220, 176, 90, 34, tx, ty)) {
+          drawFooter("Hold tag to read...", C_ORANGE);
+          uint8_t uid[7]; uint8_t uidLen;
+          if (waitForTag(uid, &uidLen, 5000)) {
+            drawFooter("Tag found — reading...", C_ORANGE);
+            delay(450);
+            memcpy(tagData.uid, uid, uidLen);
+            tagData.uidLen = uidLen;
+            if (openSpoolReadTag()) {
+              tagStatus = TAG_READ;
+            } else {
+              tagData.hasData = false;
+              tagStatus = TAG_BLANK;
+            }
+            osEntryShowingRead = true;
+          } else {
+            drawFooter("No tag detected", C_RED);
+            delay(1200);
+            osEntryShowingRead = false;
+          }
+          drawOpenSpoolEntry();
+        }
+        break;
+      }
+      case SCR_QIDI_ENTRY: {
+        if (hit(10, 30, 26, 34, tx, ty)) {
+          qidiEntryShowingRead = false;
+          qidiEntryMfgCode = (qidiEntryMfgCode == 0) ? 1 : 0;
+          drawQidiEntry();
+        } else if (hit(W-36, 30, 26, 34, tx, ty)) {
+          qidiEntryShowingRead = false;
+          qidiEntryMfgCode = (qidiEntryMfgCode == 0) ? 1 : 0;
+          drawQidiEntry();
+        }
+        else if (hit(10, 78, 26, 34, tx, ty)) {
+          qidiEntryShowingRead = false;
+          qidiEntryMatCodeIdx = (qidiEntryMatCodeIdx == 0) ? QIDI_MATERIAL_COUNT - 1 : qidiEntryMatCodeIdx - 1;
+          drawQidiEntry();
+        } else if (hit(W-36, 78, 26, 34, tx, ty)) {
+          qidiEntryShowingRead = false;
+          qidiEntryMatCodeIdx = (qidiEntryMatCodeIdx + 1) % QIDI_MATERIAL_COUNT;
+          drawQidiEntry();
+        }
+        else if (hit(10, 126, 26, 34, tx, ty)) {
+          qidiEntryShowingRead = false;
+          qidiEntryColIdx = (qidiEntryColIdx <= 1) ? 24 : qidiEntryColIdx - 1;
+          drawQidiEntry();
+        } else if (hit(W-36, 126, 26, 34, tx, ty)) {
+          qidiEntryShowingRead = false;
+          qidiEntryColIdx = (qidiEntryColIdx >= 24) ? 1 : qidiEntryColIdx + 1;
+          drawQidiEntry();
+        }
+        else if (hit(10, 176, 90, 34, tx, ty)) {
+          qidiEntryShowingRead = false;
+          currentScreen = SCR_QIDI;
+          qidiTagPresent = false;
+          drawSubMenu("K-9 — QIDI");
+        }
+        else if (hit(115, 176, 90, 34, tx, ty)) {
+          qidiEntryShowingRead = false;
+          strncpy(tagData.manufacturer, qidiManufacturerName(qidiEntryMfgCode), sizeof(tagData.manufacturer));
+          strncpy(tagData.material, qidiMaterialName(QIDI_MATERIAL_CODES[qidiEntryMatCodeIdx]), sizeof(tagData.material));
+          strncpy(tagData.color, QIDI_COLORS[qidiEntryColIdx].name, sizeof(tagData.color));
+          tagData.r = QIDI_COLORS[qidiEntryColIdx].r;
+          tagData.g = QIDI_COLORS[qidiEntryColIdx].g;
+          tagData.b = QIDI_COLORS[qidiEntryColIdx].b;
+          tagData.hasData = true;
+
+          drawFooter("Hold tag near reader...", C_ORANGE);
+          bool ok = qidiWriteTag();
+          tagStatus = ok ? TAG_WRITE_OK : TAG_WRITE_FAIL;
+          drawQidiEntry();
+          delay(1500);
+          tagStatus = TAG_NONE;
+          drawQidiEntry();
+        }
+        else if (hit(220, 176, 90, 34, tx, ty)) {
+          drawFooter("Hold tag to read...", C_ORANGE);
+          uint8_t uid[7]; uint8_t uidLen;
+          if (waitForTag(uid, &uidLen, 5000)) {
+            drawFooter("Tag found — reading...", C_ORANGE);
+            delay(450);
+            memcpy(tagData.uid, uid, uidLen);
+            tagData.uidLen = uidLen;
+            bool ok = false;
+            if (uidLen == 4) {
+              uint8_t keya[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+              if (nfc.mifareclassic_AuthenticateBlock(uid, uidLen, 4, 0, keya)) {
+                uint8_t data[16] = {0};
+                if (nfc.mifareclassic_ReadDataBlock(4, data)) {
+                  uint8_t matCode = data[0];
+                  uint8_t colCode = data[1];
+                  uint8_t mfgCode = data[2];
+                  strncpy(tagData.manufacturer, qidiManufacturerName(mfgCode), sizeof(tagData.manufacturer));
+                  strncpy(tagData.material, qidiMaterialName(matCode), sizeof(tagData.material));
+                  if (colCode >= 1 && colCode <= 24) {
+                    strncpy(tagData.color, QIDI_COLORS[colCode].name, sizeof(tagData.color));
+                    tagData.r = QIDI_COLORS[colCode].r;
+                    tagData.g = QIDI_COLORS[colCode].g;
+                    tagData.b = QIDI_COLORS[colCode].b;
+                  } else {
+                    strcpy(tagData.color, "Unknown");
+                    tagData.r = tagData.g = tagData.b = 128;
+                  }
+                  ok = true;
+                }
+              }
+            }
+            if (ok) {
+              tagData.hasData = true;
+              tagStatus = TAG_READ;
+            } else {
+              tagData.hasData = false;
+              tagStatus = TAG_BLANK;
+            }
+            qidiEntryShowingRead = true;
+          } else {
+            drawFooter("No tag detected", C_RED);
+            delay(1200);
+            qidiEntryShowingRead = false;
+          }
+          drawQidiEntry();
+          if (qidiEntryShowingRead) {
+            delay(1800);
+            qidiEntryShowingRead = false;
+            drawQidiEntry();
+          }
         }
         break;
       }
