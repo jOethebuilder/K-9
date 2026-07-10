@@ -72,6 +72,13 @@ enum Screen {
   SCR_OPENSPOOL_ENTRY,
   SCR_ANYCUBIC,
    SCR_ANYCUBIC_ENTRY,
+   SCR_ANYCUBIC_MATERIAL_PICKER,
+   SCR_ANYCUBIC_COLOR_PICKER,
+   SCR_OPENSPOOL_MATERIAL_PICKER,
+   SCR_OPENSPOOL_MANUFACTURER_PICKER,
+   SCR_OPENSPOOL_COLOR_PICKER,
+   SCR_QIDI_MATERIAL_PICKER,
+   SCR_QIDI_COLOR_PICKER,
   SCR_SETTINGS,
   SCR_NO_READER
 };
@@ -274,11 +281,19 @@ int     aceEntryNozMin = OS_MATERIALS[0].nozzleMin;
 int     aceEntryNozMax = OS_MATERIALS[0].nozzleMax;
 uint8_t aceEntryColIdx = 1;
 bool    aceEntryShowingRead = false;
+uint8_t aceMaterialPickerPage = 0;
+uint8_t aceColorPickerPage = 0;
+uint8_t osMaterialPickerPage = 0;
+uint8_t osManufacturerPickerPage = 0;
+uint8_t osColorPickerPage = 0;
+uint8_t qidiMaterialPickerPage = 0;
+uint8_t qidiColorPickerPage = 0;
 uint8_t qidiEntryMatCodeIdx = 0;   // index into QIDI_MATERIAL_CODES
 uint8_t qidiEntryMfgCode = 0;      // 0=Generic, 1=QIDI
 uint8_t qidiEntryColIdx = 1;       // index into QIDI_COLORS (1..24)
 bool    qidiEntryShowingRead = false;
 bool    qidiTagPresent = false;    // tracks whether a tag is currently on the reader (SCR_QIDI screen)
+bool  osTagPresent = false;      // tracks whether a tag is currently on the reader (SCR_OPENSPOOL screen)
 bool    aceTagPresent = false;     // tracks whether a tag is currently 
 // ============================================================
 //  NFC HELPERS
@@ -595,13 +610,35 @@ void drawOpenSpoolEntry() {
       drawButton(W-36, y, 26, 34, C_ORANGE_D, ">", C_TEXT);
     };
 
-    field(30, "MANUFACTURER", OS_MANUFACTURERS[osEntryMfgIdx]);
-    field(68, "MATERIAL", OS_MATERIALS[osEntryMatIdx].name);
+    tft.fillRect(10, 30, W-20, 34, C_CARD);
+    tft.drawRect(10, 30, W-20, 34, C_ORANGE_D);
+    tft.setTextDatum(TL_DATUM);
+    tft.setTextColor(C_MUTED, C_CARD);
+    tft.drawString("MANUFACTURER — tap to change", 14, 34, 1);
+    tft.setTextDatum(MC_DATUM);
+    tft.setTextColor(C_ORANGE, C_CARD);
+    tft.drawString(OS_MANUFACTURERS[osEntryMfgIdx], W/2, 52, 2);
 
-    uint16_t colorSw = tft.color565(QIDI_COLORS[osEntryColIdx].r,
-                                     QIDI_COLORS[osEntryColIdx].g,
-                                     QIDI_COLORS[osEntryColIdx].b);
-    field(106, "COLOR", QIDI_COLORS[osEntryColIdx].name, colorSw, true);
+    tft.fillRect(10, 68, W-20, 34, C_CARD);
+    tft.drawRect(10, 68, W-20, 34, C_ORANGE_D);
+    tft.setTextDatum(TL_DATUM);
+    tft.setTextColor(C_MUTED, C_CARD);
+    tft.drawString("MATERIAL — tap to change", 14, 72, 1);
+    tft.setTextDatum(MC_DATUM);
+    tft.setTextColor(C_ORANGE, C_CARD);
+    tft.drawString(OS_MATERIALS[osEntryMatIdx].name, W/2, 90, 2);
+
+    tft.fillRect(10, 106, W-20, 34, C_CARD);
+    tft.drawRect(10, 106, W-20, 34, C_ORANGE_D);
+    tft.setTextDatum(TL_DATUM);
+    tft.setTextColor(C_MUTED, C_CARD);
+    tft.drawString("COLOR — tap to change", 54, 110, 1);
+    uint16_t colorSw = tft.color565(QIDI_COLORS[osEntryColIdx].r, QIDI_COLORS[osEntryColIdx].g, QIDI_COLORS[osEntryColIdx].b);
+    tft.fillRect(14, 114, 32, 22, colorSw);
+    tft.drawRect(14, 114, 32, 22, C_ORANGE_D);
+    tft.setTextDatum(MC_DATUM);
+    tft.setTextColor(C_ORANGE, C_CARD);
+    tft.drawString(QIDI_COLORS[osEntryColIdx].name, W/2 + 20, 128, 1);
 
     tft.fillRect(10, 144, W-20, 26, C_CARD);
     tft.drawRect(10, 144, W-20, 26, C_ORANGE_D);
@@ -677,7 +714,18 @@ void drawAnycubicEntry() {
       tft.setTextDatum(MC_DATUM);
       tft.drawString("READ FROM TAG", W/2, 130, 1);
  }
-  } else {
+ } else {
+    // MATERIAL — tap the whole field to open the paged grid picker
+    tft.fillRect(10, 30, W-20, 34, C_CARD);
+    tft.drawRect(10, 30, W-20, 34, C_ORANGE_D);
+    tft.setTextDatum(TL_DATUM);
+    tft.setTextColor(C_MUTED, C_CARD);
+    tft.drawString("MATERIAL — tap to change", 14, 34, 1);
+    tft.setTextDatum(MC_DATUM);
+    tft.setTextColor(C_ORANGE, C_CARD);
+    tft.drawString(OS_MATERIALS[aceEntryMatIdx].name, W/2, 52, 2);
+
+    // SIZE — unchanged, still a stepper (only 4 options)
     auto field = [&](int y, const char* label, const char* value) {
       tft.fillRect(10, y, W-20, 34, C_CARD);
       tft.drawRect(10, y, W-20, 34, C_ORANGE_D);
@@ -690,27 +738,20 @@ void drawAnycubicEntry() {
       drawButton(10, y, 26, 34, C_ORANGE_D, "<", C_TEXT);
       drawButton(W-36, y, 26, 34, C_ORANGE_D, ">", C_TEXT);
     };
-
-    field(30, "MATERIAL", OS_MATERIALS[aceEntryMatIdx].name);
     field(68, "SIZE", ACE_WEIGHT_LABELS[aceEntrySizeIdx]);
 
+    // COLOR — tap the whole field to open the paged grid picker
+    tft.fillRect(10, 108, W-20, 34, C_CARD);
+    tft.drawRect(10, 108, W-20, 34, C_ORANGE_D);
     tft.setTextDatum(TL_DATUM);
     tft.setTextColor(C_MUTED, C_CARD);
-    tft.drawString("COLOR — tap to select", 12, 108, 1);
-
-    for (uint8_t i = 1; i <= 24; i++) {
-      uint8_t col = (i - 1) % 6;
-      uint8_t row = (i - 1) / 6;
-      int x = 10 + col * 50;
-      int y = 120 + row * 14;
-      uint16_t sw = tft.color565(QIDI_COLORS[i].r, QIDI_COLORS[i].g, QIDI_COLORS[i].b);
-      tft.fillRect(x, y, 48, 12, sw);
-      if (i == aceEntryColIdx) {
-        tft.drawRect(x, y, 48, 12, C_WHITE);
-      } else {
-        tft.drawRect(x, y, 48, 12, C_ORANGE_D);
-      }
-    }
+    tft.drawString("COLOR — tap to change", 54, 112, 1);
+    uint16_t curSw = tft.color565(QIDI_COLORS[aceEntryColIdx].r, QIDI_COLORS[aceEntryColIdx].g, QIDI_COLORS[aceEntryColIdx].b);
+    tft.fillRect(14, 116, 32, 22, curSw);
+    tft.drawRect(14, 116, 32, 22, C_ORANGE_D);
+    tft.setTextDatum(MC_DATUM);
+    tft.setTextColor(C_ORANGE, C_CARD);
+    tft.drawString(QIDI_COLORS[aceEntryColIdx].name, W/2 + 20, 130, 1);
   }
   drawFooter("K-9  mark 1  -  Built by Joe the Builder", C_MUTED);
 
@@ -722,6 +763,250 @@ void drawAnycubicEntry() {
   drawButton(10,  176, 90, 34, C_CARD,     "BACK", C_TEXT);
   drawButton(115, 176, 90, 34, saveBg,     "SAVE", saveFg);
   drawButton(220, 176, 90, 34, C_ORANGE_D, "READ", C_TEXT);
+}
+// ============================================================
+//  ANYCUBIC MATERIAL PICKER — paged grid, tap tile to select
+// ============================================================
+void drawAnycubicMaterialPicker() {
+  tft.fillScreen(C_BG);
+  drawHeader("K-9 — Select Material");
+
+  const uint8_t cols = 3, rows = 3;
+  const int tileW = 96, tileH = 40, gap = 4, x0 = 10, y0 = 30;
+  const uint8_t perPage = cols * rows;
+  uint8_t totalPages = (OS_MATERIALS_COUNT + perPage - 1) / perPage;
+  if (aceMaterialPickerPage >= totalPages) aceMaterialPickerPage = totalPages - 1;
+
+  uint8_t startIdx = aceMaterialPickerPage * perPage;
+  for (uint8_t i = 0; i < perPage; i++) {
+    uint8_t idx = startIdx + i;
+    if (idx >= OS_MATERIALS_COUNT) continue;
+    uint8_t col = i % cols;
+    uint8_t row = i / cols;
+    int x = x0 + col * (tileW + gap);
+    int y = y0 + row * (tileH + gap);
+    bool selected = (idx == aceEntryMatIdx);
+    tft.fillRect(x, y, tileW, tileH, selected ? C_ORANGE : C_CARD);
+    tft.drawRect(x, y, tileW, tileH, C_ORANGE_D);
+    tft.setTextDatum(MC_DATUM);
+    tft.setTextColor(selected ? C_BLACK : C_TEXT, selected ? C_ORANGE : C_CARD);
+    tft.drawString(OS_MATERIALS[idx].name, x + tileW/2, y + tileH/2, 1);
+  }
+
+  char pageBuf[24];
+  snprintf(pageBuf, sizeof(pageBuf), "Page %d / %d", aceMaterialPickerPage + 1, totalPages);
+  drawFooter(pageBuf, C_MUTED);
+
+  drawButton(10,  176, 90, 34, C_CARD,     "BACK", C_TEXT);
+  drawButton(115, 176, 90, 34, C_ORANGE_D, "<",    C_TEXT);
+  drawButton(220, 176, 90, 34, C_ORANGE_D, ">",    C_TEXT);
+}
+
+// ============================================================
+//  ANYCUBIC COLOR PICKER — paged grid, tap swatch to select
+// ============================================================
+void drawAnycubicColorPicker() {
+  tft.fillScreen(C_BG);
+  drawHeader("K-9 — Select Color");
+
+  const uint8_t cols = 4, rows = 3;
+  const int tileW = 70, tileH = 40, gap = 6, x0 = 10, y0 = 30;
+  const uint8_t perPage = cols * rows;
+  const uint8_t colorCount = 24; // QIDI_COLORS[1..24]
+  uint8_t totalPages = (colorCount + perPage - 1) / perPage;
+  if (aceColorPickerPage >= totalPages) aceColorPickerPage = totalPages - 1;
+
+  uint8_t startIdx = aceColorPickerPage * perPage;
+  for (uint8_t i = 0; i < perPage; i++) {
+    uint8_t offsetIdx = startIdx + i;
+    if (offsetIdx >= colorCount) continue;
+    uint8_t colIdx = offsetIdx + 1;
+    uint8_t col = i % cols;
+    uint8_t row = i / cols;
+    int x = x0 + col * (tileW + gap);
+    int y = y0 + row * (tileH + gap);
+    uint16_t sw = tft.color565(QIDI_COLORS[colIdx].r, QIDI_COLORS[colIdx].g, QIDI_COLORS[colIdx].b);
+    tft.fillRect(x, y, tileW, tileH, sw);
+    if (colIdx == aceEntryColIdx) {
+      tft.drawRect(x, y, tileW, tileH, C_WHITE);
+      tft.drawRect(x+1, y+1, tileW-2, tileH-2, C_WHITE);
+    } else {
+      tft.drawRect(x, y, tileW, tileH, C_ORANGE_D);
+    }
+  }
+
+  char pageBuf[24];
+  snprintf(pageBuf, sizeof(pageBuf), "Page %d / %d", aceColorPickerPage + 1, totalPages);
+  drawFooter(pageBuf, C_MUTED);
+
+  drawButton(10,  176, 90, 34, C_CARD,     "BACK", C_TEXT);
+  drawButton(115, 176, 90, 34, C_ORANGE_D, "<",    C_TEXT);
+  drawButton(220, 176, 90, 34, C_ORANGE_D, ">",    C_TEXT);
+}
+
+void drawOpenSpoolMaterialPicker() {
+  tft.fillScreen(C_BG);
+  drawHeader("K-9 — Select Material");
+  const uint8_t cols = 3, rows = 3;
+  const int tileW = 96, tileH = 40, gap = 4, x0 = 10, y0 = 30;
+  const uint8_t perPage = cols * rows;
+  uint8_t totalPages = (OS_MATERIALS_COUNT + perPage - 1) / perPage;
+  if (osMaterialPickerPage >= totalPages) osMaterialPickerPage = totalPages - 1;
+  uint8_t startIdx = osMaterialPickerPage * perPage;
+  for (uint8_t i = 0; i < perPage; i++) {
+    uint8_t idx = startIdx + i;
+    if (idx >= OS_MATERIALS_COUNT) continue;
+    uint8_t col = i % cols; uint8_t row = i / cols;
+    int x = x0 + col * (tileW + gap); int y = y0 + row * (tileH + gap);
+    bool selected = (idx == osEntryMatIdx);
+    tft.fillRect(x, y, tileW, tileH, selected ? C_ORANGE : C_CARD);
+    tft.drawRect(x, y, tileW, tileH, C_ORANGE_D);
+    tft.setTextDatum(MC_DATUM);
+    tft.setTextColor(selected ? C_BLACK : C_TEXT, selected ? C_ORANGE : C_CARD);
+    tft.drawString(OS_MATERIALS[idx].name, x + tileW/2, y + tileH/2, 1);
+  }
+  char pageBuf[24];
+  snprintf(pageBuf, sizeof(pageBuf), "Page %d / %d", osMaterialPickerPage + 1, totalPages);
+  drawFooter(pageBuf, C_MUTED);
+  drawButton(10,  176, 90, 34, C_CARD,     "BACK", C_TEXT);
+  drawButton(115, 176, 90, 34, C_ORANGE_D, "<",    C_TEXT);
+  drawButton(220, 176, 90, 34, C_ORANGE_D, ">",    C_TEXT);
+}
+void drawOpenSpoolManufacturerPicker() {
+  tft.fillScreen(C_BG);
+  drawHeader("K-9 — Select Manufacturer");
+  const uint8_t cols = 3, rows = 3;
+  const int tileW = 96, tileH = 40, gap = 4, x0 = 10, y0 = 30;
+  const uint8_t perPage = cols * rows;
+  uint8_t totalPages = (OS_MANUFACTURERS_COUNT + perPage - 1) / perPage;
+  if (osManufacturerPickerPage >= totalPages) osManufacturerPickerPage = totalPages - 1;
+  uint8_t startIdx = osManufacturerPickerPage * perPage;
+  for (uint8_t i = 0; i < perPage; i++) {
+    uint8_t idx = startIdx + i;
+    if (idx >= OS_MANUFACTURERS_COUNT) continue;
+    uint8_t col = i % cols; uint8_t row = i / cols;
+    int x = x0 + col * (tileW + gap); int y = y0 + row * (tileH + gap);
+    bool selected = (idx == osEntryMfgIdx);
+    tft.fillRect(x, y, tileW, tileH, selected ? C_ORANGE : C_CARD);
+    tft.drawRect(x, y, tileW, tileH, C_ORANGE_D);
+    tft.setTextDatum(MC_DATUM);
+    tft.setTextColor(selected ? C_BLACK : C_TEXT, selected ? C_ORANGE : C_CARD);
+    tft.drawString(OS_MANUFACTURERS[idx], x + tileW/2, y + tileH/2, 1);
+  }
+  char pageBuf[24];
+  snprintf(pageBuf, sizeof(pageBuf), "Page %d / %d", osManufacturerPickerPage + 1, totalPages);
+  drawFooter(pageBuf, C_MUTED);
+  drawButton(10,  176, 90, 34, C_CARD,     "BACK", C_TEXT);
+  drawButton(115, 176, 90, 34, C_ORANGE_D, "<",    C_TEXT);
+  drawButton(220, 176, 90, 34, C_ORANGE_D, ">",    C_TEXT);
+}
+void drawOpenSpoolColorPicker() {
+  tft.fillScreen(C_BG);
+  drawHeader("K-9 — Select Color");
+  const uint8_t cols = 4, rows = 3;
+  const int tileW = 70, tileH = 40, gap = 6, x0 = 10, y0 = 30;
+  const uint8_t perPage = cols * rows;
+  const uint8_t colorCount = 24;
+  uint8_t totalPages = (colorCount + perPage - 1) / perPage;
+  if (osColorPickerPage >= totalPages) osColorPickerPage = totalPages - 1;
+  uint8_t startIdx = osColorPickerPage * perPage;
+  for (uint8_t i = 0; i < perPage; i++) {
+    uint8_t offsetIdx = startIdx + i;
+    if (offsetIdx >= colorCount) continue;
+    uint8_t colIdx = offsetIdx + 1;
+    uint8_t col = i % cols; uint8_t row = i / cols;
+    int x = x0 + col * (tileW + gap); int y = y0 + row * (tileH + gap);
+    uint16_t sw = tft.color565(QIDI_COLORS[colIdx].r, QIDI_COLORS[colIdx].g, QIDI_COLORS[colIdx].b);
+    tft.fillRect(x, y, tileW, tileH, sw);
+    if (colIdx == osEntryColIdx) {
+      tft.drawRect(x, y, tileW, tileH, C_WHITE);
+      tft.drawRect(x+1, y+1, tileW-2, tileH-2, C_WHITE);
+    } else {
+      tft.drawRect(x, y, tileW, tileH, C_ORANGE_D);
+    }
+  }
+  char pageBuf[24];
+  snprintf(pageBuf, sizeof(pageBuf), "Page %d / %d", osColorPickerPage + 1, totalPages);
+  drawFooter(pageBuf, C_MUTED);
+  drawButton(10,  176, 90, 34, C_CARD,     "BACK", C_TEXT);
+  drawButton(115, 176, 90, 34, C_ORANGE_D, "<",    C_TEXT);
+  drawButton(220, 176, 90, 34, C_ORANGE_D, ">",    C_TEXT);
+}
+void drawQidiMaterialPicker() {
+  tft.fillScreen(C_BG);
+  drawHeader("K-9 — Select Material");
+
+  const uint8_t cols = 3, rows = 3;
+  const int tileW = 96, tileH = 40, gap = 4, x0 = 10, y0 = 30;
+  const uint8_t perPage = cols * rows;
+  uint8_t totalPages = (QIDI_MATERIAL_COUNT + perPage - 1) / perPage;
+  if (qidiMaterialPickerPage >= totalPages) qidiMaterialPickerPage = totalPages - 1;
+
+  uint8_t startIdx = qidiMaterialPickerPage * perPage;
+  for (uint8_t i = 0; i < perPage; i++) {
+    uint8_t idx = startIdx + i;
+    if (idx >= QIDI_MATERIAL_COUNT) continue;
+    uint8_t col = i % cols;
+    uint8_t row = i / cols;
+    int x = x0 + col * (tileW + gap);
+    int y = y0 + row * (tileH + gap);
+    bool selected = (idx == qidiEntryMatCodeIdx);
+    tft.fillRect(x, y, tileW, tileH, selected ? C_ORANGE : C_CARD);
+    tft.drawRect(x, y, tileW, tileH, C_ORANGE_D);
+    tft.setTextDatum(MC_DATUM);
+    tft.setTextColor(selected ? C_BLACK : C_TEXT, selected ? C_ORANGE : C_CARD);
+    tft.drawString(qidiMaterialName(QIDI_MATERIAL_CODES[idx]), x + tileW/2, y + tileH/2, 1);
+  }
+
+  char pageBuf[24];
+  snprintf(pageBuf, sizeof(pageBuf), "Page %d / %d", qidiMaterialPickerPage + 1, totalPages);
+  drawFooter(pageBuf, C_MUTED);
+
+  drawButton(10,  176, 90, 34, C_CARD,     "BACK", C_TEXT);
+  drawButton(115, 176, 90, 34, C_ORANGE_D, "<",    C_TEXT);
+  drawButton(220, 176, 90, 34, C_ORANGE_D, ">",    C_TEXT);
+}
+
+void drawQidiColorPicker() {
+  tft.fillScreen(C_BG);
+  drawHeader("K-9 — Select Color");
+
+  const uint8_t cols = 4, rows = 3;
+  const int tileW = 70, tileH = 40, gap = 6, x0 = 10, y0 = 30;
+  const uint8_t perPage = cols * rows;
+  const uint8_t colorCount = 24;
+  uint8_t totalPages = (colorCount + perPage - 1) / perPage;
+  if (qidiColorPickerPage >= totalPages) qidiColorPickerPage = totalPages - 1;
+
+  uint8_t startIdx = qidiColorPickerPage * perPage;
+  for (uint8_t i = 0; i < perPage; i++) {
+    uint8_t offsetIdx = startIdx + i;
+    if (offsetIdx >= colorCount) continue;
+    uint8_t colIdx = offsetIdx + 1;
+    uint8_t col = i % cols;
+    uint8_t row = i / cols;
+    int x = x0 + col * (tileW + gap);
+    int y = y0 + row * (tileH + gap);
+    uint8_t cr = QIDI_COLORS[colIdx].r;
+    uint8_t cg = QIDI_COLORS[colIdx].g;
+    uint8_t cb = QIDI_COLORS[colIdx].b;
+    uint16_t sw = tft.color565(cr, cg, cb);
+    tft.fillRect(x, y, tileW, tileH, sw);
+    if (colIdx == qidiEntryColIdx) {
+      tft.drawRect(x, y, tileW, tileH, C_WHITE);
+      tft.drawRect(x+1, y+1, tileW-2, tileH-2, C_WHITE);
+    } else {
+      tft.drawRect(x, y, tileW, tileH, C_ORANGE_D);
+    }
+  }
+
+  char pageBuf[24];
+  snprintf(pageBuf, sizeof(pageBuf), "Page %d / %d", qidiColorPickerPage + 1, totalPages);
+  drawFooter(pageBuf, C_MUTED);
+
+  drawButton(10,  176, 90, 34, C_CARD,     "BACK", C_TEXT);
+  drawButton(115, 176, 90, 34, C_ORANGE_D, "<",    C_TEXT);
+  drawButton(220, 176, 90, 34, C_ORANGE_D, ">",    C_TEXT);
 }
 // ============================================================
 //  QIDI MANUAL ENTRY SCREEN
@@ -781,12 +1066,27 @@ void drawQidiEntry() {
     };
 
     field(30, "MANUFACTURER", qidiManufacturerName(qidiEntryMfgCode));
-    field(78, "MATERIAL", qidiMaterialName(QIDI_MATERIAL_CODES[qidiEntryMatCodeIdx]));
 
-    uint16_t colorSw = tft.color565(QIDI_COLORS[qidiEntryColIdx].r,
-                                     QIDI_COLORS[qidiEntryColIdx].g,
-                                     QIDI_COLORS[qidiEntryColIdx].b);
-    field(126, "COLOR", QIDI_COLORS[qidiEntryColIdx].name, colorSw, true);
+    tft.fillRect(10, 78, W-20, 34, C_CARD);
+    tft.drawRect(10, 78, W-20, 34, C_ORANGE_D);
+    tft.setTextDatum(TL_DATUM);
+    tft.setTextColor(C_MUTED, C_CARD);
+    tft.drawString("MATERIAL — tap to change", 14, 82, 1);
+    tft.setTextDatum(MC_DATUM);
+    tft.setTextColor(C_ORANGE, C_CARD);
+    tft.drawString(qidiMaterialName(QIDI_MATERIAL_CODES[qidiEntryMatCodeIdx]), W/2, 100, 2);
+
+    tft.fillRect(10, 126, W-20, 34, C_CARD);
+    tft.drawRect(10, 126, W-20, 34, C_ORANGE_D);
+    tft.setTextDatum(TL_DATUM);
+    tft.setTextColor(C_MUTED, C_CARD);
+    tft.drawString("COLOR — tap to change", 54, 130, 1);
+    uint16_t colorSw = tft.color565(QIDI_COLORS[qidiEntryColIdx].r, QIDI_COLORS[qidiEntryColIdx].g, QIDI_COLORS[qidiEntryColIdx].b);
+    tft.fillRect(14, 134, 32, 22, colorSw);
+    tft.drawRect(14, 134, 32, 22, C_ORANGE_D);
+    tft.setTextDatum(MC_DATUM);
+    tft.setTextColor(C_ORANGE, C_CARD);
+    tft.drawString(QIDI_COLORS[qidiEntryColIdx].name, W/2 + 20, 148, 1);
   }
 
   drawFooter("K-9  mark 1  -  Built by Joe the Builder", C_MUTED);
@@ -1309,7 +1609,11 @@ void loop() {
       tagStatus != TAG_WRITE_OK && tagStatus != TAG_WRITE_FAIL) {
     uint8_t uid[7];
     uint8_t uidLen;
-    if (nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLen, 150)) {
+    bool found = nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLen, 150);
+
+    if (found && !osTagPresent) {
+      // New tag just placed — read it once
+      osTagPresent = true;
       memcpy(tagData.uid, uid, uidLen);
       tagData.uidLen = uidLen;
       if (openSpoolReadTag()) {
@@ -1318,6 +1622,12 @@ void loop() {
         tagData.hasData = false;
         tagStatus = TAG_BLANK;
       }
+      drawSubMenu("K-9 — OpenSpool U1");
+    } else if (!found && osTagPresent) {
+      // Tag was lifted off — reset so the next tag placed gets read
+      osTagPresent = false;
+      tagStatus = TAG_NONE;
+      tagData.hasData = false;
       drawSubMenu("K-9 — OpenSpool U1");
     }
   }
@@ -1346,6 +1656,7 @@ void loop() {
         else if (hit(10, 88,  300, 42, tx, ty)) {
           currentScreen = SCR_OPENSPOOL;
           tagStatus = TAG_NONE;
+            osTagPresent = false;
           memset(&tagData, 0, sizeof(tagData));
           drawSubMenu("K-9 — OpenSpool U1");
         }
@@ -1401,23 +1712,13 @@ case SCR_QIDI:
         }
         break;
       }
-    case SCR_ANYCUBIC_ENTRY: {
-  if (hit(10, 30, 26, 34, tx, ty)) {
+   case SCR_ANYCUBIC_ENTRY: {
+  if (hit(10, 30, W-20, 34, tx, ty)) {
+    // Tap MATERIAL field — jump to the picker page containing the current selection
     aceEntryShowingRead = false;
-    aceEntryMatIdx = (aceEntryMatIdx == 0) ? OS_MATERIALS_COUNT - 1 : aceEntryMatIdx - 1;
-    aceEntryNozMin = OS_MATERIALS[aceEntryMatIdx].nozzleMin;
-    aceEntryNozMax = OS_MATERIALS[aceEntryMatIdx].nozzleMax;
-    aceEntryBedMin = OS_MATERIALS[aceEntryMatIdx].bedMin;
-    aceEntryBedMax = OS_MATERIALS[aceEntryMatIdx].bedMax;
-    drawAnycubicEntry();
-  } else if (hit(W-36, 30, 26, 34, tx, ty)) {
-    aceEntryShowingRead = false;
-    aceEntryMatIdx = (aceEntryMatIdx + 1) % OS_MATERIALS_COUNT;
-    aceEntryNozMin = OS_MATERIALS[aceEntryMatIdx].nozzleMin;
-    aceEntryNozMax = OS_MATERIALS[aceEntryMatIdx].nozzleMax;
-    aceEntryBedMin = OS_MATERIALS[aceEntryMatIdx].bedMin;
-    aceEntryBedMax = OS_MATERIALS[aceEntryMatIdx].bedMax;
-    drawAnycubicEntry();
+    aceMaterialPickerPage = aceEntryMatIdx / 9;
+    currentScreen = SCR_ANYCUBIC_MATERIAL_PICKER;
+    drawAnycubicMaterialPicker();
   }
   else if (hit(10, 68, 26, 34, tx, ty)) {
     aceEntryShowingRead = false;
@@ -1428,15 +1729,12 @@ case SCR_QIDI:
     aceEntrySizeIdx = (aceEntrySizeIdx + 1) % ACE_WEIGHT_COUNT;
     drawAnycubicEntry();
   }
-  else if (hit(10, 120, 300, 56, tx, ty)) {
+  else if (hit(10, 108, W-20, 34, tx, ty)) {
+    // Tap COLOR field — jump to the picker page containing the current selection
     aceEntryShowingRead = false;
-    int col = (tx - 10) / 50;
-    int row = (ty - 120) / 14;
-    if (col >= 0 && col < 6 && row >= 0 && row < 4) {
-      uint8_t idx = row * 6 + col + 1;
-      if (idx >= 1 && idx <= 24) aceEntryColIdx = idx;
-    }
-    drawAnycubicEntry();
+    aceColorPickerPage = (aceEntryColIdx - 1) / 12;
+    currentScreen = SCR_ANYCUBIC_COLOR_PICKER;
+    drawAnycubicColorPicker();
   }
   else if (hit(10, 176, 90, 34, tx, ty)) {
     aceEntryShowingRead = false;
@@ -1493,43 +1791,206 @@ case SCR_QIDI:
       drawAnycubicEntry();
     }
   }
-  break;
+break;
 }
+      case SCR_ANYCUBIC_MATERIAL_PICKER: {
+        const uint8_t cols = 3, rows = 3;
+        const int tileW = 96, tileH = 40, gap = 4, x0 = 10, y0 = 30;
+        const uint8_t perPage = cols * rows;
+        uint8_t totalPages = (OS_MATERIALS_COUNT + perPage - 1) / perPage;
+
+        bool tileTapped = false;
+        for (uint8_t i = 0; i < perPage && !tileTapped; i++) {
+          uint8_t idx = aceMaterialPickerPage * perPage + i;
+          if (idx >= OS_MATERIALS_COUNT) continue;
+          uint8_t col = i % cols;
+          uint8_t row = i / cols;
+          int x = x0 + col * (tileW + gap);
+          int y = y0 + row * (tileH + gap);
+          if (hit(x, y, tileW, tileH, tx, ty)) {
+            aceEntryMatIdx = idx;
+            aceEntryNozMin = OS_MATERIALS[idx].nozzleMin;
+            aceEntryNozMax = OS_MATERIALS[idx].nozzleMax;
+            aceEntryBedMin = OS_MATERIALS[idx].bedMin;
+            aceEntryBedMax = OS_MATERIALS[idx].bedMax;
+            currentScreen = SCR_ANYCUBIC_ENTRY;
+            drawAnycubicEntry();
+            tileTapped = true;
+          }
+        }
+
+        if (!tileTapped) {
+          if (hit(10, 176, 90, 34, tx, ty)) {
+            currentScreen = SCR_ANYCUBIC_ENTRY;
+            drawAnycubicEntry();
+          } else if (hit(115, 176, 90, 34, tx, ty)) {
+            aceMaterialPickerPage = (aceMaterialPickerPage == 0) ? totalPages - 1 : aceMaterialPickerPage - 1;
+            drawAnycubicMaterialPicker();
+          } else if (hit(220, 176, 90, 34, tx, ty)) {
+            aceMaterialPickerPage = (aceMaterialPickerPage + 1) % totalPages;
+            drawAnycubicMaterialPicker();
+          }
+        }
+        break;
+      }
+      case SCR_ANYCUBIC_COLOR_PICKER: {
+        const uint8_t cols = 4, rows = 3;
+        const int tileW = 70, tileH = 40, gap = 6, x0 = 10, y0 = 30;
+        const uint8_t perPage = cols * rows;
+        const uint8_t colorCount = 24;
+        uint8_t totalPages = (colorCount + perPage - 1) / perPage;
+
+        bool tileTapped = false;
+        for (uint8_t i = 0; i < perPage && !tileTapped; i++) {
+          uint8_t offsetIdx = aceColorPickerPage * perPage + i;
+          if (offsetIdx >= colorCount) continue;
+          uint8_t colIdx = offsetIdx + 1;
+          uint8_t col = i % cols;
+          uint8_t row = i / cols;
+          int x = x0 + col * (tileW + gap);
+          int y = y0 + row * (tileH + gap);
+          if (hit(x, y, tileW, tileH, tx, ty)) {
+            aceEntryColIdx = colIdx;
+            currentScreen = SCR_ANYCUBIC_ENTRY;
+            drawAnycubicEntry();
+            tileTapped = true;
+          }
+        }
+
+        if (!tileTapped) {
+          if (hit(10, 176, 90, 34, tx, ty)) {
+            currentScreen = SCR_ANYCUBIC_ENTRY;
+            drawAnycubicEntry();
+          } else if (hit(115, 176, 90, 34, tx, ty)) {
+            aceColorPickerPage = (aceColorPickerPage == 0) ? totalPages - 1 : aceColorPickerPage - 1;
+            drawAnycubicColorPicker();
+          } else if (hit(220, 176, 90, 34, tx, ty)) {
+            aceColorPickerPage = (aceColorPickerPage + 1) % totalPages;
+            drawAnycubicColorPicker();
+          }
+        }
+        break;
+      }
+      case SCR_OPENSPOOL_MATERIAL_PICKER: {
+        const uint8_t cols = 3, rows = 3;
+        const int tileW = 96, tileH = 40, gap = 4, x0 = 10, y0 = 30;
+        const uint8_t perPage = cols * rows;
+        uint8_t totalPages = (OS_MATERIALS_COUNT + perPage - 1) / perPage;
+        bool tileTapped = false;
+        for (uint8_t i = 0; i < perPage && !tileTapped; i++) {
+          uint8_t idx = osMaterialPickerPage * perPage + i;
+          if (idx >= OS_MATERIALS_COUNT) continue;
+          uint8_t col = i % cols; uint8_t row = i / cols;
+          int x = x0 + col * (tileW + gap); int y = y0 + row * (tileH + gap);
+          if (hit(x, y, tileW, tileH, tx, ty)) {
+            osEntryMatIdx = idx;
+            osEntryNozMin = OS_MATERIALS[idx].nozzleMin;
+            osEntryNozMax = OS_MATERIALS[idx].nozzleMax;
+            osEntryBedMin = OS_MATERIALS[idx].bedMin;
+            osEntryBedMax = OS_MATERIALS[idx].bedMax;
+            currentScreen = SCR_OPENSPOOL_ENTRY;
+            drawOpenSpoolEntry();
+            tileTapped = true;
+          }
+        }
+        if (!tileTapped) {
+          if (hit(10, 176, 90, 34, tx, ty)) {
+            currentScreen = SCR_OPENSPOOL_ENTRY;
+            drawOpenSpoolEntry();
+          } else if (hit(115, 176, 90, 34, tx, ty)) {
+            osMaterialPickerPage = (osMaterialPickerPage == 0) ? totalPages - 1 : osMaterialPickerPage - 1;
+            drawOpenSpoolMaterialPicker();
+          } else if (hit(220, 176, 90, 34, tx, ty)) {
+            osMaterialPickerPage = (osMaterialPickerPage + 1) % totalPages;
+            drawOpenSpoolMaterialPicker();
+          }
+        }
+        break;
+      }
+      case SCR_OPENSPOOL_MANUFACTURER_PICKER: {
+        const uint8_t cols = 3, rows = 3;
+        const int tileW = 96, tileH = 40, gap = 4, x0 = 10, y0 = 30;
+        const uint8_t perPage = cols * rows;
+        uint8_t totalPages = (OS_MANUFACTURERS_COUNT + perPage - 1) / perPage;
+        bool tileTapped = false;
+        for (uint8_t i = 0; i < perPage && !tileTapped; i++) {
+          uint8_t idx = osManufacturerPickerPage * perPage + i;
+          if (idx >= OS_MANUFACTURERS_COUNT) continue;
+          uint8_t col = i % cols; uint8_t row = i / cols;
+          int x = x0 + col * (tileW + gap); int y = y0 + row * (tileH + gap);
+          if (hit(x, y, tileW, tileH, tx, ty)) {
+            osEntryMfgIdx = idx;
+            currentScreen = SCR_OPENSPOOL_ENTRY;
+            drawOpenSpoolEntry();
+            tileTapped = true;
+          }
+        }
+        if (!tileTapped) {
+          if (hit(10, 176, 90, 34, tx, ty)) {
+            currentScreen = SCR_OPENSPOOL_ENTRY;
+            drawOpenSpoolEntry();
+          } else if (hit(115, 176, 90, 34, tx, ty)) {
+            osManufacturerPickerPage = (osManufacturerPickerPage == 0) ? totalPages - 1 : osManufacturerPickerPage - 1;
+            drawOpenSpoolManufacturerPicker();
+          } else if (hit(220, 176, 90, 34, tx, ty)) {
+            osManufacturerPickerPage = (osManufacturerPickerPage + 1) % totalPages;
+            drawOpenSpoolManufacturerPicker();
+          }
+        }
+        break;
+      }
+      case SCR_OPENSPOOL_COLOR_PICKER: {
+        const uint8_t cols = 4, rows = 3;
+        const int tileW = 70, tileH = 40, gap = 6, x0 = 10, y0 = 30;
+        const uint8_t perPage = cols * rows;
+        const uint8_t colorCount = 24;
+        uint8_t totalPages = (colorCount + perPage - 1) / perPage;
+        bool tileTapped = false;
+        for (uint8_t i = 0; i < perPage && !tileTapped; i++) {
+          uint8_t offsetIdx = osColorPickerPage * perPage + i;
+          if (offsetIdx >= colorCount) continue;
+          uint8_t colIdx = offsetIdx + 1;
+          uint8_t col = i % cols; uint8_t row = i / cols;
+          int x = x0 + col * (tileW + gap); int y = y0 + row * (tileH + gap);
+          if (hit(x, y, tileW, tileH, tx, ty)) {
+            osEntryColIdx = colIdx;
+            currentScreen = SCR_OPENSPOOL_ENTRY;
+            drawOpenSpoolEntry();
+            tileTapped = true;
+          }
+        }
+        if (!tileTapped) {
+          if (hit(10, 176, 90, 34, tx, ty)) {
+            currentScreen = SCR_OPENSPOOL_ENTRY;
+            drawOpenSpoolEntry();
+          } else if (hit(115, 176, 90, 34, tx, ty)) {
+            osColorPickerPage = (osColorPickerPage == 0) ? totalPages - 1 : osColorPickerPage - 1;
+            drawOpenSpoolColorPicker();
+          } else if (hit(220, 176, 90, 34, tx, ty)) {
+            osColorPickerPage = (osColorPickerPage + 1) % totalPages;
+            drawOpenSpoolColorPicker();
+          }
+        }
+        break;
+      }
       case SCR_OPENSPOOL_ENTRY: {
-        if (hit(10, 30, 26, 34, tx, ty)) {
+        if (hit(10, 30, W-20, 34, tx, ty)) {
           osEntryShowingRead = false;
-          osEntryMfgIdx = (osEntryMfgIdx == 0) ? OS_MANUFACTURERS_COUNT - 1 : osEntryMfgIdx - 1;
-          drawOpenSpoolEntry();
-        } else if (hit(W-36, 30, 26, 34, tx, ty)) {
-          osEntryShowingRead = false;
-          osEntryMfgIdx = (osEntryMfgIdx + 1) % OS_MANUFACTURERS_COUNT;
-          drawOpenSpoolEntry();
+          osManufacturerPickerPage = osEntryMfgIdx / 9;
+          currentScreen = SCR_OPENSPOOL_MANUFACTURER_PICKER;
+          drawOpenSpoolManufacturerPicker();
         }
-        else if (hit(10, 68, 26, 34, tx, ty)) {
+        else if (hit(10, 68, W-20, 34, tx, ty)) {
           osEntryShowingRead = false;
-          osEntryMatIdx = (osEntryMatIdx == 0) ? OS_MATERIALS_COUNT - 1 : osEntryMatIdx - 1;
-          osEntryNozMin = OS_MATERIALS[osEntryMatIdx].nozzleMin;
-          osEntryNozMax = OS_MATERIALS[osEntryMatIdx].nozzleMax;
-          osEntryBedMin = OS_MATERIALS[osEntryMatIdx].bedMin;
-          osEntryBedMax = OS_MATERIALS[osEntryMatIdx].bedMax;
-          drawOpenSpoolEntry();
-        } else if (hit(W-36, 68, 26, 34, tx, ty)) {
-          osEntryShowingRead = false;
-          osEntryMatIdx = (osEntryMatIdx + 1) % OS_MATERIALS_COUNT;
-          osEntryNozMin = OS_MATERIALS[osEntryMatIdx].nozzleMin;
-          osEntryNozMax = OS_MATERIALS[osEntryMatIdx].nozzleMax;
-          osEntryBedMin = OS_MATERIALS[osEntryMatIdx].bedMin;
-          osEntryBedMax = OS_MATERIALS[osEntryMatIdx].bedMax;
-          drawOpenSpoolEntry();
+          osMaterialPickerPage = osEntryMatIdx / 9;
+          currentScreen = SCR_OPENSPOOL_MATERIAL_PICKER;
+          drawOpenSpoolMaterialPicker();
         }
-        else if (hit(10, 106, 26, 34, tx, ty)) {
+        else if (hit(10, 106, W-20, 34, tx, ty)) {
           osEntryShowingRead = false;
-          osEntryColIdx = (osEntryColIdx <= 1) ? 24 : osEntryColIdx - 1;
-          drawOpenSpoolEntry();
-        } else if (hit(W-36, 106, 26, 34, tx, ty)) {
-          osEntryShowingRead = false;
-          osEntryColIdx = (osEntryColIdx >= 24) ? 1 : osEntryColIdx + 1;
-          drawOpenSpoolEntry();
+          osColorPickerPage = (osEntryColIdx - 1) / 12;
+          currentScreen = SCR_OPENSPOOL_COLOR_PICKER;
+          drawOpenSpoolColorPicker();
         }
         else if (hit(10, 144, 26, 26, tx, ty)) {
           osEntryShowingRead = false;
@@ -1543,6 +2004,7 @@ case SCR_QIDI:
         else if (hit(10, 176, 90, 34, tx, ty)) {
           osEntryShowingRead = false;
           currentScreen = SCR_OPENSPOOL;
+          osTagPresent = false;
           drawSubMenu("K-9 — OpenSpool U1");
         }
         else if (hit(115, 176, 90, 34, tx, ty)) {
@@ -1586,6 +2048,77 @@ case SCR_QIDI:
             osEntryShowingRead = false;
           }
           drawOpenSpoolEntry();
+          if (osEntryShowingRead) {
+            delay(1800);
+            osEntryShowingRead = false;
+            drawOpenSpoolEntry();
+          }
+        }
+        break;
+      }
+      case SCR_QIDI_MATERIAL_PICKER: {
+        const uint8_t cols = 3, rows = 3;
+        const int tileW = 96, tileH = 40, gap = 4, x0 = 10, y0 = 30;
+        const uint8_t perPage = cols * rows;
+        uint8_t totalPages = (QIDI_MATERIAL_COUNT + perPage - 1) / perPage;
+        bool tileTapped = false;
+        for (uint8_t i = 0; i < perPage && !tileTapped; i++) {
+          uint8_t idx = qidiMaterialPickerPage * perPage + i;
+          if (idx >= QIDI_MATERIAL_COUNT) continue;
+          uint8_t col = i % cols; uint8_t row = i / cols;
+          int x = x0 + col * (tileW + gap); int y = y0 + row * (tileH + gap);
+          if (hit(x, y, tileW, tileH, tx, ty)) {
+            qidiEntryMatCodeIdx = idx;
+            currentScreen = SCR_QIDI_ENTRY;
+            drawQidiEntry();
+            tileTapped = true;
+          }
+        }
+        if (!tileTapped) {
+          if (hit(10, 176, 90, 34, tx, ty)) {
+            currentScreen = SCR_QIDI_ENTRY;
+            drawQidiEntry();
+          } else if (hit(115, 176, 90, 34, tx, ty)) {
+            qidiMaterialPickerPage = (qidiMaterialPickerPage == 0) ? totalPages - 1 : qidiMaterialPickerPage - 1;
+            drawQidiMaterialPicker();
+          } else if (hit(220, 176, 90, 34, tx, ty)) {
+            qidiMaterialPickerPage = (qidiMaterialPickerPage + 1) % totalPages;
+            drawQidiMaterialPicker();
+          }
+        }
+        break;
+      }
+      case SCR_QIDI_COLOR_PICKER: {
+        const uint8_t cols = 4, rows = 3;
+        const int tileW = 70, tileH = 40, gap = 6, x0 = 10, y0 = 30;
+        const uint8_t perPage = cols * rows;
+        const uint8_t colorCount = 24;
+        uint8_t totalPages = (colorCount + perPage - 1) / perPage;
+        bool tileTapped = false;
+        for (uint8_t i = 0; i < perPage && !tileTapped; i++) {
+          uint8_t offsetIdx = qidiColorPickerPage * perPage + i;
+          if (offsetIdx >= colorCount) continue;
+          uint8_t colIdx = offsetIdx + 1;
+          uint8_t col = i % cols; uint8_t row = i / cols;
+          int x = x0 + col * (tileW + gap); int y = y0 + row * (tileH + gap);
+          if (hit(x, y, tileW, tileH, tx, ty)) {
+            qidiEntryColIdx = colIdx;
+            currentScreen = SCR_QIDI_ENTRY;
+            drawQidiEntry();
+            tileTapped = true;
+          }
+        }
+        if (!tileTapped) {
+          if (hit(10, 176, 90, 34, tx, ty)) {
+            currentScreen = SCR_QIDI_ENTRY;
+            drawQidiEntry();
+          } else if (hit(115, 176, 90, 34, tx, ty)) {
+            qidiColorPickerPage = (qidiColorPickerPage == 0) ? totalPages - 1 : qidiColorPickerPage - 1;
+            drawQidiColorPicker();
+          } else if (hit(220, 176, 90, 34, tx, ty)) {
+            qidiColorPickerPage = (qidiColorPickerPage + 1) % totalPages;
+            drawQidiColorPicker();
+          }
         }
         break;
       }
@@ -1599,23 +2132,17 @@ case SCR_QIDI:
           qidiEntryMfgCode = (qidiEntryMfgCode == 0) ? 1 : 0;
           drawQidiEntry();
         }
-        else if (hit(10, 78, 26, 34, tx, ty)) {
+        else if (hit(10, 78, W-20, 34, tx, ty)) {
           qidiEntryShowingRead = false;
-          qidiEntryMatCodeIdx = (qidiEntryMatCodeIdx == 0) ? QIDI_MATERIAL_COUNT - 1 : qidiEntryMatCodeIdx - 1;
-          drawQidiEntry();
-        } else if (hit(W-36, 78, 26, 34, tx, ty)) {
-          qidiEntryShowingRead = false;
-          qidiEntryMatCodeIdx = (qidiEntryMatCodeIdx + 1) % QIDI_MATERIAL_COUNT;
-          drawQidiEntry();
+          qidiMaterialPickerPage = qidiEntryMatCodeIdx / 9;
+          currentScreen = SCR_QIDI_MATERIAL_PICKER;
+          drawQidiMaterialPicker();
         }
-        else if (hit(10, 126, 26, 34, tx, ty)) {
+        else if (hit(10, 126, W-20, 34, tx, ty)) {
           qidiEntryShowingRead = false;
-          qidiEntryColIdx = (qidiEntryColIdx <= 1) ? 24 : qidiEntryColIdx - 1;
-          drawQidiEntry();
-        } else if (hit(W-36, 126, 26, 34, tx, ty)) {
-          qidiEntryShowingRead = false;
-          qidiEntryColIdx = (qidiEntryColIdx >= 24) ? 1 : qidiEntryColIdx + 1;
-          drawQidiEntry();
+          qidiColorPickerPage = (qidiEntryColIdx - 1) / 12;
+          currentScreen = SCR_QIDI_COLOR_PICKER;
+          drawQidiColorPicker();
         }
         else if (hit(10, 176, 90, 34, tx, ty)) {
           qidiEntryShowingRead = false;
