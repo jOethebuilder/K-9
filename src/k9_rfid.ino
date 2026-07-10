@@ -105,8 +105,8 @@ TagData tagData;
 
 // ── ACE tag data ────────────────────────────────────────────
 struct AceTagData {
-  char brand[17];
-  char material[17];
+  char brand[20];
+  char material[20];
   char sku[17];
   uint8_t r, g, b;
   int extMin, extMax;
@@ -252,6 +252,11 @@ const char* OS_MANUFACTURERS[] = {
   "FLASHFORGE", "CC3D", "ZIRO"
 };
 const uint8_t OS_MANUFACTURERS_COUNT = sizeof(OS_MANUFACTURERS) / sizeof(OS_MANUFACTURERS[0]);
+
+const char* ACE_WEIGHT_LABELS[] = { "1 KG", "750 G", "500 G", "250 G" };
+const int   ACE_WEIGHT_LENGTHS[] = { 330, 247, 165, 82 };
+const uint8_t ACE_WEIGHT_COUNT = 4;
+
 // ── OpenSpool manual entry state ───────────────────────────
 uint8_t osEntryMatIdx = 0;   // index into OS_MATERIALS
 uint8_t osEntryMfgIdx = 0;   // index into OS_MANUFACTURERS
@@ -262,12 +267,12 @@ int     osEntryNozMin = OS_MATERIALS[0].nozzleMin;
 int     osEntryNozMax = OS_MATERIALS[0].nozzleMax;
 bool    osEntryShowingRead = false;   // true = entry screen is showing a READ result instead of edit fields
 uint8_t aceEntryMatIdx = 0;
-uint8_t aceEntryMfgIdx = 0;
-uint8_t aceEntryColIdx = 1;
+uint8_t aceEntrySizeIdx = 0;  
 int     aceEntryBedMin = OS_MATERIALS[0].bedMin;
 int     aceEntryBedMax = OS_MATERIALS[0].bedMax;
 int     aceEntryNozMin = OS_MATERIALS[0].nozzleMin;
 int     aceEntryNozMax = OS_MATERIALS[0].nozzleMax;
+uint8_t aceEntryColIdx = 1;
 bool    aceEntryShowingRead = false;
 uint8_t qidiEntryMatCodeIdx = 0;   // index into QIDI_MATERIAL_CODES
 uint8_t qidiEntryMfgCode = 0;      // 0=Generic, 1=QIDI
@@ -670,9 +675,9 @@ void drawAnycubicEntry() {
       tft.setTextColor(C_GREEN, C_CARD);
       tft.setTextDatum(MC_DATUM);
       tft.drawString("READ FROM TAG", W/2, 130, 1);
-    }
+ }
   } else {
-    auto field = [&](int y, const char* label, const char* value, uint16_t sw = 0xFFFF, bool showSwatch = false) {
+    auto field = [&](int y, const char* label, const char* value) {
       tft.fillRect(10, y, W-20, 34, C_CARD);
       tft.drawRect(10, y, W-20, 34, C_ORANGE_D);
       tft.setTextDatum(TL_DATUM);
@@ -681,36 +686,31 @@ void drawAnycubicEntry() {
       tft.setTextDatum(MC_DATUM);
       tft.setTextColor(C_ORANGE, C_CARD);
       tft.drawString(value, W/2, y + 22, 2);
-      if (showSwatch) {
-        tft.fillRect(W-46, y+8, 20, 18, sw);
-        tft.drawRect(W-46, y+8, 20, 18, C_ORANGE_D);
-      }
       drawButton(10, y, 26, 34, C_ORANGE_D, "<", C_TEXT);
       drawButton(W-36, y, 26, 34, C_ORANGE_D, ">", C_TEXT);
     };
 
-    field(30, "MANUFACTURER", OS_MANUFACTURERS[aceEntryMfgIdx]);
-    field(68, "MATERIAL", OS_MATERIALS[aceEntryMatIdx].name);
+    field(30, "MATERIAL", OS_MATERIALS[aceEntryMatIdx].name);
+    field(68, "SIZE", ACE_WEIGHT_LABELS[aceEntrySizeIdx]);
 
-    uint16_t colorSw = tft.color565(QIDI_COLORS[aceEntryColIdx].r,
-                                     QIDI_COLORS[aceEntryColIdx].g,
-                                     QIDI_COLORS[aceEntryColIdx].b);
-    field(106, "COLOR", QIDI_COLORS[aceEntryColIdx].name, colorSw, true);
-
-    tft.fillRect(10, 144, W-20, 26, C_CARD);
-    tft.drawRect(10, 144, W-20, 26, C_ORANGE_D);
     tft.setTextDatum(TL_DATUM);
     tft.setTextColor(C_MUTED, C_CARD);
-    tft.drawString("NOZZLE", 44, 148, 1);
-    char buf[24];
-    snprintf(buf, sizeof(buf), "%d-%d C", aceEntryNozMin, aceEntryNozMax);
-    tft.setTextDatum(MC_DATUM);
-    tft.setTextColor(C_TEXT, C_CARD);
-    tft.drawString(buf, W/2, 157, 2);
-    drawButton(10, 144, 26, 26, C_ORANGE_D, "-", C_TEXT);
-    drawButton(W-36, 144, 26, 26, C_ORANGE_D, "+", C_TEXT);
-  }
+    tft.drawString("COLOR — tap to select", 12, 108, 1);
 
+    for (uint8_t i = 1; i <= 24; i++) {
+      uint8_t col = (i - 1) % 6;
+      uint8_t row = (i - 1) / 6;
+      int x = 10 + col * 50;
+      int y = 120 + row * 14;
+      uint16_t sw = tft.color565(QIDI_COLORS[i].r, QIDI_COLORS[i].g, QIDI_COLORS[i].b);
+      tft.fillRect(x, y, 48, 12, sw);
+      if (i == aceEntryColIdx) {
+        tft.drawRect(x, y, 48, 12, C_WHITE);
+      } else {
+        tft.drawRect(x, y, 48, 12, C_ORANGE_D);
+      }
+    }
+  }
   drawFooter("K-9  mark 1  -  Built by Joe the Builder", C_MUTED);
 
   uint16_t saveBg = C_ORANGE;
@@ -827,21 +827,24 @@ bool aceReadTag() {
   if (page[0] != 0x7B) return false;
 
   memset(tagData.manufacturer, 0, sizeof(tagData.manufacturer));
-  for (uint8_t p = 0; p < 4; p++) {
+  for (uint8_t p = 0; p < 5; p++) {
     if (!readNfcPage(10 + p, page)) break;
-    for (uint8_t i = 0; i < 4 && (p*4+i) < 16; i++)
+    for (uint8_t i = 0; i < 4 && (p*4+i) < 20; i++)
       if (page[i]) tagData.manufacturer[p*4+i] = (char)page[i];
   }
 
   memset(tagData.material, 0, sizeof(tagData.material));
-  for (uint8_t p = 0; p < 4; p++) {
+  for (uint8_t p = 0; p < 5; p++) {
     if (!readNfcPage(15 + p, page)) break;
-    for (uint8_t i = 0; i < 4 && (p*4+i) < 16; i++)
+    for (uint8_t i = 0; i < 4 && (p*4+i) < 20; i++)
       if (page[i]) tagData.material[p*4+i] = (char)page[i];
   }
 
   if (readNfcPage(20, page)) {
-    tagData.r = page[3]; tagData.g = page[2]; tagData.b = page[1];
+    // page = [Alpha, Blue, Green, Red]
+    tagData.b = page[1];
+    tagData.g = page[2];
+    tagData.r = page[3];
   }
   strncpy(tagData.color, nearestColorName(tagData.r, tagData.g, tagData.b), sizeof(tagData.color));
 
@@ -855,31 +858,31 @@ bool aceReadTag() {
 // ============================================================
 //  ACE TAG WRITE  (stub — needs NTAG215 tags to test)
 // ============================================================
+int aceWriteLengthM = 330;
 bool aceWriteTag() {
   uint8_t uid[7]; uint8_t uidLen;
   if (!waitForTag(uid, &uidLen, 5000)) return false;
 
   uint8_t page[4];
 
-  memset(page, 0, 4);
-  page[0] = 0x7B;
+  page[0] = 0x7B; page[1] = 0x00; page[2] = 0x65; page[3] = 0x00;
   if (!writeNfcPage(4, page)) return false;
 
-  char mfgBuf[16] = {0};
-  strncpy(mfgBuf, tagData.manufacturer, 16);
-  for (uint8_t p = 0; p < 4; p++) {
-    memcpy(page, mfgBuf + p*4, 4);
+  char brandBuf[20] = {0};
+  strncpy(brandBuf, "AC", 20);
+  for (uint8_t p = 0; p < 5; p++) {
+    memcpy(page, brandBuf + p*4, 4);
     if (!writeNfcPage(10 + p, page)) return false;
   }
 
-  char matBuf[16] = {0};
-  strncpy(matBuf, tagData.material, 16);
-  for (uint8_t p = 0; p < 4; p++) {
+  char matBuf[20] = {0};
+  strncpy(matBuf, tagData.material, 20);
+  for (uint8_t p = 0; p < 5; p++) {
     memcpy(page, matBuf + p*4, 4);
     if (!writeNfcPage(15 + p, page)) return false;
   }
 
-  memset(page, 0, 4);
+  page[0] = 0xFF;
   page[1] = tagData.b;
   page[2] = tagData.g;
   page[3] = tagData.r;
@@ -892,6 +895,13 @@ bool aceWriteTag() {
   intToByteLE(tagData.bedMin, page);
   intToByteLE(tagData.bedMax, page + 2);
   if (!writeNfcPage(29, page)) return false;
+
+  intToByteLE(175, page);
+  intToByteLE(aceWriteLengthM, page + 2);
+  if (!writeNfcPage(30, page)) return false;
+
+  page[0] = 0xE8; page[1] = 0x03; page[2] = 0x00; page[3] = 0x00;
+  if (!writeNfcPage(31, page)) return false;
 
   return true;
 }
@@ -1356,100 +1366,94 @@ case SCR_QIDI:
         }
         break;
       }
-         case SCR_ANYCUBIC_ENTRY: {
-        if (hit(10, 30, 26, 34, tx, ty)) {
-          aceEntryShowingRead = false;
-          aceEntryMfgIdx = (aceEntryMfgIdx == 0) ? OS_MANUFACTURERS_COUNT - 1 : aceEntryMfgIdx - 1;
-          drawAnycubicEntry();
-        } else if (hit(W-36, 30, 26, 34, tx, ty)) {
-          aceEntryShowingRead = false;
-          aceEntryMfgIdx = (aceEntryMfgIdx + 1) % OS_MANUFACTURERS_COUNT;
-          drawAnycubicEntry();
-        }
-        else if (hit(10, 68, 26, 34, tx, ty)) {
-          aceEntryShowingRead = false;
-          aceEntryMatIdx = (aceEntryMatIdx == 0) ? OS_MATERIALS_COUNT - 1 : aceEntryMatIdx - 1;
-          aceEntryNozMin = OS_MATERIALS[aceEntryMatIdx].nozzleMin;
-          aceEntryNozMax = OS_MATERIALS[aceEntryMatIdx].nozzleMax;
-          aceEntryBedMin = OS_MATERIALS[aceEntryMatIdx].bedMin;
-          aceEntryBedMax = OS_MATERIALS[aceEntryMatIdx].bedMax;
-          drawAnycubicEntry();
-        } else if (hit(W-36, 68, 26, 34, tx, ty)) {
-          aceEntryShowingRead = false;
-          aceEntryMatIdx = (aceEntryMatIdx + 1) % OS_MATERIALS_COUNT;
-          aceEntryNozMin = OS_MATERIALS[aceEntryMatIdx].nozzleMin;
-          aceEntryNozMax = OS_MATERIALS[aceEntryMatIdx].nozzleMax;
-          aceEntryBedMin = OS_MATERIALS[aceEntryMatIdx].bedMin;
-          aceEntryBedMax = OS_MATERIALS[aceEntryMatIdx].bedMax;
-          drawAnycubicEntry();
-        }
-        else if (hit(10, 106, 26, 34, tx, ty)) {
-          aceEntryShowingRead = false;
-          aceEntryColIdx = (aceEntryColIdx <= 1) ? 24 : aceEntryColIdx - 1;
-          drawAnycubicEntry();
-        } else if (hit(W-36, 106, 26, 34, tx, ty)) {
-          aceEntryShowingRead = false;
-          aceEntryColIdx = (aceEntryColIdx >= 24) ? 1 : aceEntryColIdx + 1;
-          drawAnycubicEntry();
-        }
-        else if (hit(10, 144, 26, 26, tx, ty)) {
-          aceEntryShowingRead = false;
-          aceEntryNozMin -= 5; aceEntryNozMax -= 5;
-          drawAnycubicEntry();
-        } else if (hit(W-36, 144, 26, 26, tx, ty)) {
-          aceEntryShowingRead = false;
-          aceEntryNozMin += 5; aceEntryNozMax += 5;
-          drawAnycubicEntry();
-        }
-        else if (hit(10, 176, 90, 34, tx, ty)) {
-          aceEntryShowingRead = false;
-          currentScreen = SCR_ANYCUBIC;
-          drawSubMenu("K-9 — Anycubic");
-        }
-        else if (hit(115, 176, 90, 34, tx, ty)) {
-          aceEntryShowingRead = false;
-          strncpy(tagData.manufacturer, OS_MANUFACTURERS[aceEntryMfgIdx], sizeof(tagData.manufacturer));
-          strncpy(tagData.material, OS_MATERIALS[aceEntryMatIdx].name, sizeof(tagData.material));
-          strncpy(tagData.color, QIDI_COLORS[aceEntryColIdx].name, sizeof(tagData.color));
-          tagData.r = QIDI_COLORS[aceEntryColIdx].r;
-          tagData.g = QIDI_COLORS[aceEntryColIdx].g;
-          tagData.b = QIDI_COLORS[aceEntryColIdx].b;
-          tagData.extMin = aceEntryNozMin; tagData.extMax = aceEntryNozMax;
-          tagData.bedMin = aceEntryBedMin; tagData.bedMax = aceEntryBedMax;
-          tagData.hasData = true;
+    case SCR_ANYCUBIC_ENTRY: {
+  if (hit(10, 30, 26, 34, tx, ty)) {
+    aceEntryShowingRead = false;
+    aceEntryMatIdx = (aceEntryMatIdx == 0) ? OS_MATERIALS_COUNT - 1 : aceEntryMatIdx - 1;
+    aceEntryNozMin = OS_MATERIALS[aceEntryMatIdx].nozzleMin;
+    aceEntryNozMax = OS_MATERIALS[aceEntryMatIdx].nozzleMax;
+    aceEntryBedMin = OS_MATERIALS[aceEntryMatIdx].bedMin;
+    aceEntryBedMax = OS_MATERIALS[aceEntryMatIdx].bedMax;
+    drawAnycubicEntry();
+  } else if (hit(W-36, 30, 26, 34, tx, ty)) {
+    aceEntryShowingRead = false;
+    aceEntryMatIdx = (aceEntryMatIdx + 1) % OS_MATERIALS_COUNT;
+    aceEntryNozMin = OS_MATERIALS[aceEntryMatIdx].nozzleMin;
+    aceEntryNozMax = OS_MATERIALS[aceEntryMatIdx].nozzleMax;
+    aceEntryBedMin = OS_MATERIALS[aceEntryMatIdx].bedMin;
+    aceEntryBedMax = OS_MATERIALS[aceEntryMatIdx].bedMax;
+    drawAnycubicEntry();
+  }
+  else if (hit(10, 68, 26, 34, tx, ty)) {
+    aceEntryShowingRead = false;
+    aceEntrySizeIdx = (aceEntrySizeIdx == 0) ? ACE_WEIGHT_COUNT - 1 : aceEntrySizeIdx - 1;
+    drawAnycubicEntry();
+  } else if (hit(W-36, 68, 26, 34, tx, ty)) {
+    aceEntryShowingRead = false;
+    aceEntrySizeIdx = (aceEntrySizeIdx + 1) % ACE_WEIGHT_COUNT;
+    drawAnycubicEntry();
+  }
+  else if (hit(10, 120, 300, 56, tx, ty)) {
+    aceEntryShowingRead = false;
+    int col = (tx - 10) / 50;
+    int row = (ty - 120) / 14;
+    if (col >= 0 && col < 6 && row >= 0 && row < 4) {
+      uint8_t idx = row * 6 + col + 1;
+      if (idx >= 1 && idx <= 24) aceEntryColIdx = idx;
+    }
+    drawAnycubicEntry();
+  }
+  else if (hit(10, 176, 90, 34, tx, ty)) {
+    aceEntryShowingRead = false;
+    currentScreen = SCR_ANYCUBIC;
+    drawSubMenu("K-9 — Anycubic");
+  }
+  else if (hit(115, 176, 90, 34, tx, ty)) {
+    aceEntryShowingRead = false;
+    strncpy(tagData.manufacturer, "AC", sizeof(tagData.manufacturer));
+    strncpy(tagData.material, OS_MATERIALS[aceEntryMatIdx].name, sizeof(tagData.material));
+    tagData.r = QIDI_COLORS[aceEntryColIdx].r;
+    tagData.g = QIDI_COLORS[aceEntryColIdx].g;
+    tagData.b = QIDI_COLORS[aceEntryColIdx].b;
+    strncpy(tagData.color, QIDI_COLORS[aceEntryColIdx].name, sizeof(tagData.color));
+    tagData.extMin = aceEntryNozMin; tagData.extMax = aceEntryNozMax;
+    tagData.bedMin = aceEntryBedMin; tagData.bedMax = aceEntryBedMax;
+    tagData.hasData = true;
 
-          drawFooter("Hold tag near reader...", C_ORANGE);
-          bool ok = aceWriteTag();
-          tagStatus = ok ? TAG_WRITE_OK : TAG_WRITE_FAIL;
-          drawAnycubicEntry();
-          delay(1500);
-          tagStatus = TAG_NONE;
-          drawAnycubicEntry();
-        }
-        else if (hit(220, 176, 90, 34, tx, ty)) {
-          drawFooter("Hold tag to read...", C_ORANGE);
-          uint8_t uid[7]; uint8_t uidLen;
-          if (waitForTag(uid, &uidLen, 5000)) {
-            drawFooter("Tag found — reading...", C_ORANGE);
-            delay(450);
-            memcpy(tagData.uid, uid, uidLen);
-            tagData.uidLen = uidLen;
-            if (aceReadTag()) {
-              tagStatus = TAG_READ;
-            } else {
-              tagData.hasData = false;
-              tagStatus = TAG_BLANK;
-            }
-            aceEntryShowingRead = true;
-          } else {
-            drawFooter("No tag detected", C_RED);
-            delay(1200);
-            aceEntryShowingRead = false;
-          }
-          drawAnycubicEntry();
-        }
-        break;
+    aceWriteLengthM = ACE_WEIGHT_LENGTHS[aceEntrySizeIdx];
+
+    drawFooter("Hold tag near reader...", C_ORANGE);
+    bool ok = aceWriteTag();
+    tagStatus = ok ? TAG_WRITE_OK : TAG_WRITE_FAIL;
+    drawAnycubicEntry();
+    delay(1500);
+    tagStatus = TAG_NONE;
+    drawAnycubicEntry();
+  }
+  else if (hit(220, 176, 90, 34, tx, ty)) {
+    drawFooter("Hold tag to read...", C_ORANGE);
+    uint8_t uid[7]; uint8_t uidLen;
+    if (waitForTag(uid, &uidLen, 5000)) {
+      drawFooter("Tag found — reading...", C_ORANGE);
+      delay(450);
+      memcpy(tagData.uid, uid, uidLen);
+      tagData.uidLen = uidLen;
+      if (aceReadTag()) {
+        tagStatus = TAG_READ;
+      } else {
+        tagData.hasData = false;
+        tagStatus = TAG_BLANK;
       }
+      aceEntryShowingRead = true;
+    } else {
+      drawFooter("No tag detected", C_RED);
+      delay(1200);
+      aceEntryShowingRead = false;
+    }
+    drawAnycubicEntry();
+  }
+  break;
+}
       case SCR_OPENSPOOL_ENTRY: {
         if (hit(10, 30, 26, 34, tx, ty)) {
           osEntryShowingRead = false;
