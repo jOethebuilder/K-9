@@ -279,6 +279,7 @@ uint8_t qidiEntryMfgCode = 0;      // 0=Generic, 1=QIDI
 uint8_t qidiEntryColIdx = 1;       // index into QIDI_COLORS (1..24)
 bool    qidiEntryShowingRead = false;
 bool    qidiTagPresent = false;    // tracks whether a tag is currently on the reader (SCR_QIDI screen)
+bool    aceTagPresent = false;     // tracks whether a tag is currently 
 // ============================================================
 //  NFC HELPERS
 // ============================================================
@@ -854,7 +855,21 @@ bool aceReadTag() {
   tagData.hasData = true;
   return true;
 }
-
+// ============================================================
+//  ACE SKU LOOKUP
+// ============================================================
+void GetSku(const char* materialName, uint8_t* skuData /* 20 bytes */) {
+  memset(skuData, 0, 20);
+  const char* sku = nullptr;
+  if      (strcmp(materialName, "ABS")            == 0) sku = "SHABBK-102";
+  else if (strcmp(materialName, "PLA High Speed") == 0) sku = "AHHSBK-103";
+  else if (strcmp(materialName, "PLA Matte")      == 0) sku = "HYGBK-102";
+  else if (strcmp(materialName, "PLA Silk")       == 0) sku = "AHSCWH-102";
+  else if (strcmp(materialName, "TPU")            == 0) sku = "STPBK-101";
+  else if (strcmp(materialName, "PLA+")           == 0) sku = "AHPLPBK-102";
+  else if (strcmp(materialName, "PLA")            == 0) sku = "AHPLBK-101";
+  if (sku) strncpy((char*)skuData, sku, 20);
+}
 // ============================================================
 //  ACE TAG WRITE  (stub — needs NTAG215 tags to test)
 // ============================================================
@@ -867,6 +882,13 @@ bool aceWriteTag() {
 
   page[0] = 0x7B; page[1] = 0x00; page[2] = 0x65; page[3] = 0x00;
   if (!writeNfcPage(4, page)) return false;
+
+   uint8_t skuBuf[20];
+  GetSku(tagData.material, skuBuf);
+  for (uint8_t p = 0; p < 5; p++) {
+    memcpy(page, skuBuf + p*4, 4);
+    if (!writeNfcPage(5 + p, page)) return false;
+  }
 
   char brandBuf[20] = {0};
   strncpy(brandBuf, "AC", 20);
@@ -1252,12 +1274,18 @@ void loop() {
     // (!found && !qidiTagPresent) — do nothing, no redraw, no reprocessing.
   }
 
-  // Auto scan on Anycubic screen
+ // Auto scan on Anycubic screen
+  // Same presence-tracking pattern as QIDI: read once per tag placement,
+  // and reset to "waiting" when the tag is lifted so the next one gets read.
   if (nfcReady && currentScreen == SCR_ANYCUBIC &&
       tagStatus != TAG_WRITE_OK && tagStatus != TAG_WRITE_FAIL) {
     uint8_t uid[7];
     uint8_t uidLen;
-    if (nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLen, 150)) {
+    bool found = nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLen, 150);
+
+    if (found && !aceTagPresent) {
+      // New tag just placed — read it once
+      aceTagPresent = true;
       memcpy(tagData.uid, uid, uidLen);
       tagData.uidLen = uidLen;
       if (aceReadTag()) {
@@ -1266,6 +1294,12 @@ void loop() {
         tagData.hasData = false;
         tagStatus = TAG_BLANK;
       }
+      drawSubMenu("K-9 — Anycubic");
+    } else if (!found && aceTagPresent) {
+      // Tag was lifted off — reset so the next tag placed gets read
+      aceTagPresent = false;
+      tagStatus = TAG_NONE;
+      tagData.hasData = false;
       drawSubMenu("K-9 — Anycubic");
     }
   }
@@ -1318,6 +1352,7 @@ void loop() {
         else if (hit(10, 136, 300, 42, tx, ty)) {
           currentScreen = SCR_ANYCUBIC;
           tagStatus = TAG_NONE;
+          aceTagPresent = false;
           memset(&tagData, 0, sizeof(tagData));
           drawSubMenu("K-9 — Anycubic");
         }
@@ -1406,6 +1441,7 @@ case SCR_QIDI:
   else if (hit(10, 176, 90, 34, tx, ty)) {
     aceEntryShowingRead = false;
     currentScreen = SCR_ANYCUBIC;
+    aceTagPresent = false;
     drawSubMenu("K-9 — Anycubic");
   }
   else if (hit(115, 176, 90, 34, tx, ty)) {
@@ -1451,6 +1487,11 @@ case SCR_QIDI:
       aceEntryShowingRead = false;
     }
     drawAnycubicEntry();
+    if (aceEntryShowingRead) {
+      delay(1800);
+      aceEntryShowingRead = false;
+      drawAnycubicEntry();
+    }
   }
   break;
 }
