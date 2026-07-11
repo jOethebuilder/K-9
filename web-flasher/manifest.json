@@ -6,9 +6,9 @@
       "chipFamily": "ESP32",
       "parts": [
         { "path": "k9-v0.0.0-.ino.bootloader.bin", "offset": 4096 },
-        { "path": "k9-v0.0.0-..ino.partitions.bin", "offset": 32768 },
+        { "path": "k9-v0.0.0-.ino.partitions.bin", "offset": 32768 },
         { "path": "boot_app0.bin", "offset": 57344 },
-        { "path": "k9-v0.0.0-..ino.bin", "offset": 65536 }
+        { "path": "k9-v0.0.0-.ino.bin", "offset": 65536 }
       ]
     }
   ]
