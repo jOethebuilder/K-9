@@ -19,6 +19,9 @@
 #include <XPT2046_Touchscreen.h>
 #include <Adafruit_PN532.h>
 #include <ArduinoJson.h>
+#include <WiFi.h>
+#include <esp_wifi.h>
+#include <Preferences.h>
 
 // Compatibility with newer ESP32 board packages (core 3.x) that dropped these
 #ifndef VSPI
@@ -80,6 +83,9 @@ enum Screen {
    SCR_QIDI_MATERIAL_PICKER,
    SCR_QIDI_COLOR_PICKER,
   SCR_SETTINGS,
+  SCR_WIFI,
+  SCR_WIFI_SCAN,
+  SCR_WIFI_KEYBOARD,
   SCR_NO_READER
 };
 Screen currentScreen = SCR_SPLASH;
@@ -223,6 +229,21 @@ const char* nearestColorName(uint8_t r, uint8_t g, uint8_t b) {
   }
   return QIDI_COLORS[bestIdx].name;
 }
+
+const uint8_t ANYCUBIC_COLORS[][3] = {
+  {0x25,0xC4,0xDA}, {0x00,0x99,0xA7}, {0x0B,0x35,0x9A}, {0x0A,0x4A,0xB6},
+  {0x11,0xB6,0xEE}, {0x90,0xC6,0xF5}, {0xFA,0x7C,0x0C}, {0xF7,0xB3,0x0F},
+  {0xE5,0xC2,0x0F}, {0xB1,0x8F,0x2E}, {0x8D,0x76,0x6D}, {0x6C,0x4E,0x43},
+  {0xE6,0x2E,0x2E}, {0xEE,0x28,0x62}, {0xEA,0x2A,0x2B}, {0xE8,0x3D,0x89},
+  {0xAE,0x2E,0x65}, {0x61,0x1C,0x8B}, {0x8D,0x60,0xC7}, {0xB2,0x87,0xC9},
+  {0x00,0x67,0x64}, {0x01,0x8D,0x80}, {0x42,0xB5,0xAE}, {0x1D,0x82,0x2D},
+  {0x54,0xB3,0x51}, {0x72,0xE1,0x15}, {0x47,0x47,0x47}, {0x66,0x87,0x98},
+  {0xB1,0xBE,0xC6}, {0x58,0x63,0x6E}, {0xF8,0xE9,0x11}, {0xF6,0xD3,0x11},
+  {0xF2,0xEF,0xCE}, {0xFF,0xFF,0xFF}, {0x00,0x00,0x00}
+};
+const uint8_t ANYCUBIC_COLOR_COUNT = 35;
+
+
 // ============================================================
 //  OPENSPOOL LOOKUP TABLES
 // ============================================================
@@ -279,7 +300,7 @@ int     aceEntryBedMin = OS_MATERIALS[0].bedMin;
 int     aceEntryBedMax = OS_MATERIALS[0].bedMax;
 int     aceEntryNozMin = OS_MATERIALS[0].nozzleMin;
 int     aceEntryNozMax = OS_MATERIALS[0].nozzleMax;
-uint8_t aceEntryColIdx = 1;
+uint8_t aceEntryColIdx = 0;   // index into ANYCUBIC_COLORS (0..34)
 bool    aceEntryShowingRead = false;
 uint8_t aceMaterialPickerPage = 0;
 uint8_t aceColorPickerPage = 0;
@@ -295,6 +316,24 @@ bool    qidiEntryShowingRead = false;
 bool    qidiTagPresent = false;    // tracks whether a tag is currently on the reader (SCR_QIDI screen)
 bool  osTagPresent = false;      // tracks whether a tag is currently on the reader (SCR_OPENSPOOL screen)
 bool    aceTagPresent = false;     // tracks whether a tag is currently 
+// ── WiFi state ──────────────────────────────────────────────
+Preferences prefs;
+bool   wifiConnected    = false;
+String wifiCurrentSSID  = "";
+String wifiCurrentIP    = "";
+
+#define WIFI_SCAN_MAX 20
+String  wifiScanSSIDs[WIFI_SCAN_MAX];
+bool    wifiScanOpen[WIFI_SCAN_MAX];
+int     wifiScanCount = 0;
+uint8_t wifiScanPage  = 0;
+
+// ── On-screen keyboard state ────────────────────────────────
+String kbBuffer     = "";
+String kbTargetSSID = "";
+bool   kbIsPassword = false;
+bool   kbShift      = false;
+bool   kbSymbols    = false;
 // ============================================================
 //  NFC HELPERS
 // ============================================================
@@ -351,6 +390,73 @@ bool ensureOpenSpoolCC() {
 
   if (!readNfcPage(NTAG_CC_PAGE, page)) return false;
   return memcmp(page, NTAG_CC, 4) == 0;
+}
+// ============================================================
+//  WIFI HELPERS
+// ============================================================
+void saveWifiCreds(const String& ssid, const String& pass) {
+  prefs.begin("k9wifi", false);
+  prefs.putString("ssid", ssid);
+  prefs.putString("pass", pass);
+  prefs.end();
+}
+
+bool loadWifiCreds(String& ssid, String& pass) {
+  prefs.begin("k9wifi", true);
+  ssid = prefs.getString("ssid", "");
+  pass = prefs.getString("pass", "");
+  prefs.end();
+  return ssid.length() > 0;
+}
+
+void clearWifiCreds() {
+  prefs.begin("k9wifi", false);
+  prefs.clear();
+  prefs.end();
+}
+
+void wifiEventHandler(WiFiEvent_t event, WiFiEventInfo_t info) {
+  if (event == ARDUINO_EVENT_WIFI_STA_DISCONNECTED) {
+    Serial.print("[WiFi] Disconnect reason: ");
+    Serial.println(info.wifi_sta_disconnected.reason);
+  }
+}
+
+bool attemptWifiConnect(const String& ssid, const String& pass, uint32_t timeoutMs) {
+  Serial.print("[WiFi] Connecting to SSID: ["); Serial.print(ssid); Serial.println("]");
+  Serial.print("[WiFi] Password: ["); Serial.print(pass); Serial.println("]");
+
+  WiFi.disconnect(true, true);
+  delay(100);
+  WiFi.mode(WIFI_STA);
+  esp_wifi_set_ps(WIFI_PS_NONE);
+  delay(100);
+
+  if (pass.length() == 0) {
+    WiFi.begin(ssid.c_str());
+  } else {
+    WiFi.begin(ssid.c_str(), pass.c_str());
+  }
+
+  uint32_t start = millis();
+  while (WiFi.status() != WL_CONNECTED && millis() - start < timeoutMs) {
+    delay(250);
+    Serial.print("[WiFi] status: "); Serial.println(WiFi.status());
+  }
+
+  if (WiFi.status() == WL_CONNECTED) {
+    wifiConnected   = true;
+    wifiCurrentSSID = ssid;
+    wifiCurrentIP   = WiFi.localIP().toString();
+    Serial.print("[WiFi] Connected, IP: "); Serial.println(wifiCurrentIP);
+    return true;
+  }
+
+  Serial.print("[WiFi] FAILED, final status: "); Serial.println(WiFi.status());
+  wifiConnected   = false;
+  wifiCurrentSSID = "";
+  wifiCurrentIP   = "";
+  return false;
 }
 // ============================================================
 //  DRAW HELPERS
@@ -698,7 +804,9 @@ void drawAnycubicEntry() {
       tft.drawRect(18, 82, 70, 18, C_ORANGE_D);
       tft.setTextColor(C_BLACK, sw);
       tft.setTextDatum(MC_DATUM);
-      tft.drawString(tagData.color[0] ? tagData.color : "--", 53, 91, 1);
+      char aceHex[10];
+      snprintf(aceHex, sizeof(aceHex), "FF%02X%02X%02X", tagData.r, tagData.g, tagData.b);
+      tft.drawString(aceHex, 53, 91, 1);
 
       tft.setTextDatum(TL_DATUM);
       tft.setTextColor(C_MUTED, C_CARD);
@@ -746,12 +854,15 @@ void drawAnycubicEntry() {
     tft.setTextDatum(TL_DATUM);
     tft.setTextColor(C_MUTED, C_CARD);
     tft.drawString("COLOR — tap to change", 54, 112, 1);
-    uint16_t curSw = tft.color565(QIDI_COLORS[aceEntryColIdx].r, QIDI_COLORS[aceEntryColIdx].g, QIDI_COLORS[aceEntryColIdx].b);
+    uint16_t curSw = tft.color565(ANYCUBIC_COLORS[aceEntryColIdx][0], ANYCUBIC_COLORS[aceEntryColIdx][1], ANYCUBIC_COLORS[aceEntryColIdx][2]);
     tft.fillRect(14, 116, 32, 22, curSw);
     tft.drawRect(14, 116, 32, 22, C_ORANGE_D);
     tft.setTextDatum(MC_DATUM);
     tft.setTextColor(C_ORANGE, C_CARD);
-    tft.drawString(QIDI_COLORS[aceEntryColIdx].name, W/2 + 20, 130, 1);
+    char aceEntryHex[10];
+    snprintf(aceEntryHex, sizeof(aceEntryHex), "FF%02X%02X%02X",
+             ANYCUBIC_COLORS[aceEntryColIdx][0], ANYCUBIC_COLORS[aceEntryColIdx][1], ANYCUBIC_COLORS[aceEntryColIdx][2]);
+    tft.drawString(aceEntryHex, W/2 + 20, 130, 1);
   }
   drawFooter("K-9  mark 1  -  Built by Joe the Builder", C_MUTED);
 
@@ -812,20 +923,19 @@ void drawAnycubicColorPicker() {
   const uint8_t cols = 4, rows = 3;
   const int tileW = 70, tileH = 40, gap = 6, x0 = 10, y0 = 30;
   const uint8_t perPage = cols * rows;
-  const uint8_t colorCount = 24; // QIDI_COLORS[1..24]
+  const uint8_t colorCount = ANYCUBIC_COLOR_COUNT;
   uint8_t totalPages = (colorCount + perPage - 1) / perPage;
   if (aceColorPickerPage >= totalPages) aceColorPickerPage = totalPages - 1;
 
   uint8_t startIdx = aceColorPickerPage * perPage;
   for (uint8_t i = 0; i < perPage; i++) {
-    uint8_t offsetIdx = startIdx + i;
-    if (offsetIdx >= colorCount) continue;
-    uint8_t colIdx = offsetIdx + 1;
+    uint8_t colIdx = startIdx + i;
+    if (colIdx >= colorCount) continue;
     uint8_t col = i % cols;
     uint8_t row = i / cols;
     int x = x0 + col * (tileW + gap);
     int y = y0 + row * (tileH + gap);
-    uint16_t sw = tft.color565(QIDI_COLORS[colIdx].r, QIDI_COLORS[colIdx].g, QIDI_COLORS[colIdx].b);
+    uint16_t sw = tft.color565(ANYCUBIC_COLORS[colIdx][0], ANYCUBIC_COLORS[colIdx][1], ANYCUBIC_COLORS[colIdx][2]);
     tft.fillRect(x, y, tileW, tileH, sw);
     if (colIdx == aceEntryColIdx) {
       tft.drawRect(x, y, tileW, tileH, C_WHITE);
@@ -1118,6 +1228,157 @@ void drawNoReader() {
   tft.setTextColor(C_ORANGE, C_BG);
   tft.drawString("Tap anywhere to continue", W/2, 180, 1);
 }
+// ============================================================
+//  SETTINGS SCREEN
+// ============================================================
+void drawSettings() {
+  tft.fillScreen(C_BG);
+  drawHeader("K-9 — Settings");
+
+  const int x = 10, w = W - 20, h = 24, gap = 4;
+  int y = 30;
+
+  drawButton(x, y, w, h, C_CARD, "WIFI", C_ORANGE);              y += h + gap;
+  drawButton(x, y, w, h, C_CARD, "BACKLIGHT", C_MUTED);          y += h + gap;
+  drawButton(x, y, w, h, C_CARD, "NFC STATUS", C_MUTED);         y += h + gap;
+  drawButton(x, y, w, h, C_CARD, "TOUCH CALIBRATION", C_MUTED);  y += h + gap;
+  drawButton(x, y, w, h, C_CARD, "FIRMWARE INFO", C_MUTED);      y += h + gap;
+  drawButton(x, y, w, h, C_CARD, "FACTORY RESET", C_MUTED);      y += h + gap;
+  drawButton(x, y, w, h, C_ORANGE_D, "BACK", C_TEXT);
+
+  drawFooter("K-9  mark 1  -  Built by Joe the Builder", C_MUTED);
+}
+
+// ============================================================
+//  WIFI STATUS SCREEN
+// ============================================================
+void drawWifi() {
+  tft.fillScreen(C_BG);
+  drawHeader("K-9 — WiFi");
+
+  tft.fillRect(10, 30, W-20, 100, C_CARD);
+  tft.drawRect(10, 30, W-20, 100, C_ORANGE_D);
+  tft.setTextDatum(TL_DATUM);
+  tft.setTextColor(C_MUTED, C_CARD);
+  tft.drawString("STATUS", 18, 38, 1);
+
+  tft.setTextDatum(MC_DATUM);
+  if (wifiConnected) {
+    tft.setTextColor(C_GREEN, C_CARD);
+    tft.drawString("CONNECTED", W/2, 62, 2);
+    tft.setTextColor(C_ORANGE, C_CARD);
+    tft.drawString(wifiCurrentSSID.c_str(), W/2, 86, 2);
+    tft.setTextColor(C_TEXT, C_CARD);
+    tft.drawString(wifiCurrentIP.c_str(), W/2, 108, 1);
+  } else {
+    tft.setTextColor(C_RED, C_CARD);
+    tft.drawString("NOT CONNECTED", W/2, 80, 2);
+  }
+
+  drawFooter("K-9  mark 1  -  Built by Joe the Builder", C_MUTED);
+
+  drawButton(10,  176, 90, 34, C_CARD,     "BACK",  C_TEXT);
+  drawButton(115, 176, 90, 34, C_ORANGE_D, "SCAN",  C_TEXT);
+  uint16_t discBg = wifiConnected ? C_ORANGE_D : 0x4208;
+  uint16_t discFg = wifiConnected ? C_TEXT     : C_MUTED;
+  drawButton(220, 176, 90, 34, discBg, "FORGET", discFg);
+}
+
+// ============================================================
+//  WIFI NETWORK SCAN LIST
+// ============================================================
+void drawWifiScan() {
+  tft.fillScreen(C_BG);
+  drawHeader("K-9 — Select Network");
+
+  const int rowH = 26, gap = 2, x0 = 10, y0 = 30, rowW = W - 20;
+  const uint8_t perPage = 6;
+  uint8_t totalPages = wifiScanCount == 0 ? 1 : (wifiScanCount + perPage - 1) / perPage;
+  if (wifiScanPage >= totalPages) wifiScanPage = totalPages - 1;
+
+  if (wifiScanCount == 0) {
+    tft.setTextDatum(MC_DATUM);
+    tft.setTextColor(C_MUTED, C_BG);
+    tft.drawString("No networks found", W/2, 100, 2);
+  } else {
+    uint8_t startIdx = wifiScanPage * perPage;
+    for (uint8_t i = 0; i < perPage; i++) {
+      uint8_t idx = startIdx + i;
+      if (idx >= wifiScanCount) continue;
+      int y = y0 + i * (rowH + gap);
+      tft.fillRect(x0, y, rowW, rowH, C_CARD);
+      tft.drawRect(x0, y, rowW, rowH, C_ORANGE_D);
+      tft.setTextDatum(TL_DATUM);
+      tft.setTextColor(C_ORANGE, C_CARD);
+      tft.drawString(wifiScanSSIDs[idx].c_str(), x0 + 8, y + 7, 2);
+      tft.setTextDatum(TR_DATUM);
+      tft.setTextColor(C_MUTED, C_CARD);
+      tft.drawString(wifiScanOpen[idx] ? "OPEN" : "LOCK", x0 + rowW - 8, y + 8, 1);
+    }
+  }
+
+  char pageBuf[24];
+  snprintf(pageBuf, sizeof(pageBuf), "Page %d / %d", wifiScanPage + 1, totalPages);
+  drawFooter(pageBuf, C_MUTED);
+
+  drawButton(10,  176, 90, 34, C_CARD,     "BACK", C_TEXT);
+  drawButton(115, 176, 90, 34, C_ORANGE_D, "<",    C_TEXT);
+  drawButton(220, 176, 90, 34, C_ORANGE_D, ">",    C_TEXT);
+}
+
+// ============================================================
+//  ON-SCREEN KEYBOARD (SSID / PASSWORD ENTRY)
+// ============================================================
+void drawWifiKeyboard() {
+  tft.fillScreen(C_BG);
+  drawHeader(kbIsPassword ? "K-9 — Enter Password" : "K-9 — Enter SSID");
+
+  tft.fillRect(10, 30, W-20, 24, C_CARD);
+  tft.drawRect(10, 30, W-20, 24, C_ORANGE_D);
+  tft.setTextDatum(MC_DATUM);
+  tft.setTextColor(C_ORANGE, C_CARD);
+  String preview = kbBuffer;
+  if (preview.length() == 0) preview = kbIsPassword ? "(password)" : "(network name)";
+  tft.drawString(preview.c_str(), W/2, 42, 2);
+
+  const char* row1  = "1234567890";
+  const char* row2  = "QWERTYUIOP";
+  const char* row3  = "ASDFGHJKL";
+  const char* row4L = "ZXCVBNM";
+  const char* row2S = "!@#$%^&*()";
+  const char* row3S = "-_=+[]{};:";
+  const char* row4S = ",.<>/?~`";
+
+  const char* r2 = kbSymbols ? row2S : row2;
+  const char* r3 = kbSymbols ? row3S : row3;
+  const char* r4 = kbSymbols ? row4S : row4L;
+
+  auto drawRow = [&](const char* chars, int y) {
+    int count = strlen(chars);
+    int tileW = (W - 20) / count;
+    for (int i = 0; i < count; i++) {
+      int x = 10 + i * tileW;
+      char c = chars[i];
+      if (!kbSymbols) c = kbShift ? toupper(c) : tolower(c);
+      char label[2] = { c, 0 };
+      drawButton(x, y, tileW - 1, 24, C_CARD, label, C_TEXT);
+    }
+  };
+
+  drawRow(row1, 60);
+  drawRow(r2, 86);
+  drawRow(r3, 112);
+  drawRow(r4, 138);
+
+  drawButton(10,  176, 48, 34, C_CARD, "CANCEL", C_TEXT);
+  drawButton(60,  176, 48, 34, kbShift ? C_ORANGE : C_ORANGE_D, "SHIFT", kbShift ? C_BLACK : C_TEXT);
+  drawButton(110, 176, 48, 34, C_ORANGE_D, kbSymbols ? "ABC" : "123", C_TEXT);
+  drawButton(160, 176, 80, 34, C_ORANGE_D, "SPACE", C_TEXT);
+  drawButton(242, 176, 34, 34, C_ORANGE_D, "<-",    C_TEXT);
+  drawButton(278, 176, 32, 34, C_GREEN,    "OK",    C_BLACK);
+
+  drawFooter("K-9  mark 1  -  Built by Joe the Builder", C_MUTED);
+}
 
 // ============================================================
 //  ACE TAG READ
@@ -1147,7 +1408,7 @@ bool aceReadTag() {
     tagData.g = page[2];
     tagData.r = page[3];
   }
-  strncpy(tagData.color, nearestColorName(tagData.r, tagData.g, tagData.b), sizeof(tagData.color));
+  snprintf(tagData.color, sizeof(tagData.color), "FF%02X%02X%02X", tagData.r, tagData.g, tagData.b);
 
   if (readNfcPage(24, page)) { tagData.extMin = byteToIntLE(page); tagData.extMax = byteToIntLE(page+2); }
   if (readNfcPage(29, page)) { tagData.bedMin = byteToIntLE(page); tagData.bedMax = byteToIntLE(page+2); }
@@ -1473,6 +1734,7 @@ bool openSpoolWriteTag() {
 // ============================================================
 void setup() {
   Serial.begin(115200);
+  WiFi.onEvent(wifiEventHandler);
 
   tft.init();
   tft.setRotation(1);
@@ -1509,6 +1771,11 @@ void setup() {
 
   memset(&tagData, 0, sizeof(tagData));
   tagStatus = TAG_NONE;
+
+  String savedSsid, savedPass;
+  if (loadWifiCreds(savedSsid, savedPass)) {
+    attemptWifiConnect(savedSsid, savedPass, 8000);
+  }
 }
 
 // ============================================================
@@ -1668,8 +1935,8 @@ void loop() {
           drawSubMenu("K-9 — Anycubic");
         }
         else if (hit(10, 184, 300, 34, tx, ty)) {
-          currentScreen = SCR_SETTINGS;
-          // Settings screen coming soon-do nothng
+         currentScreen = SCR_SETTINGS;
+          drawSettings();
         }
         break;
 case SCR_QIDI:
@@ -1732,7 +1999,7 @@ case SCR_QIDI:
   else if (hit(10, 108, W-20, 34, tx, ty)) {
     // Tap COLOR field — jump to the picker page containing the current selection
     aceEntryShowingRead = false;
-    aceColorPickerPage = (aceEntryColIdx - 1) / 12;
+    aceColorPickerPage = aceEntryColIdx / 12;
     currentScreen = SCR_ANYCUBIC_COLOR_PICKER;
     drawAnycubicColorPicker();
   }
@@ -1746,10 +2013,10 @@ case SCR_QIDI:
     aceEntryShowingRead = false;
     strncpy(tagData.manufacturer, "AC", sizeof(tagData.manufacturer));
     strncpy(tagData.material, OS_MATERIALS[aceEntryMatIdx].name, sizeof(tagData.material));
-    tagData.r = QIDI_COLORS[aceEntryColIdx].r;
-    tagData.g = QIDI_COLORS[aceEntryColIdx].g;
-    tagData.b = QIDI_COLORS[aceEntryColIdx].b;
-    strncpy(tagData.color, QIDI_COLORS[aceEntryColIdx].name, sizeof(tagData.color));
+    tagData.r = ANYCUBIC_COLORS[aceEntryColIdx][0];
+    tagData.g = ANYCUBIC_COLORS[aceEntryColIdx][1];
+    tagData.b = ANYCUBIC_COLORS[aceEntryColIdx][2];
+    snprintf(tagData.color, sizeof(tagData.color), "FF%02X%02X%02X", tagData.r, tagData.g, tagData.b);
     tagData.extMin = aceEntryNozMin; tagData.extMax = aceEntryNozMax;
     tagData.bedMin = aceEntryBedMin; tagData.bedMax = aceEntryBedMax;
     tagData.hasData = true;
@@ -1837,14 +2104,13 @@ break;
         const uint8_t cols = 4, rows = 3;
         const int tileW = 70, tileH = 40, gap = 6, x0 = 10, y0 = 30;
         const uint8_t perPage = cols * rows;
-        const uint8_t colorCount = 24;
+        const uint8_t colorCount = ANYCUBIC_COLOR_COUNT;
         uint8_t totalPages = (colorCount + perPage - 1) / perPage;
 
         bool tileTapped = false;
         for (uint8_t i = 0; i < perPage && !tileTapped; i++) {
-          uint8_t offsetIdx = aceColorPickerPage * perPage + i;
-          if (offsetIdx >= colorCount) continue;
-          uint8_t colIdx = offsetIdx + 1;
+          uint8_t colIdx = aceColorPickerPage * perPage + i;
+          if (colIdx >= colorCount) continue;
           uint8_t col = i % cols;
           uint8_t row = i / cols;
           int x = x0 + col * (tileW + gap);
@@ -2220,6 +2486,167 @@ break;
             drawQidiEntry();
           }
         }
+     break;
+      }
+     case SCR_SETTINGS: {
+        const int x = 10, w = W - 20, h = 24, gap = 4;
+        int y0 = 30;
+        if (hit(x, y0 + 0*(h+gap), w, h, tx, ty)) {
+          currentScreen = SCR_WIFI;
+          drawWifi();
+        }
+        else if (hit(x, y0 + 6*(h+gap), w, h, tx, ty)) {
+          currentScreen = SCR_MAIN;
+          drawMain();
+        }
+        // Backlight / NFC Status / Touch Calibration / Firmware Info / Factory
+        // Reset rows are stubs for now — no action on tap yet.
+        break;
+      }
+      case SCR_WIFI: {
+        if (hit(10, 176, 90, 34, tx, ty)) {
+          currentScreen = SCR_SETTINGS;
+          drawSettings();
+        }
+        else if (hit(115, 176, 90, 34, tx, ty)) {
+          drawFooter("Scanning...", C_ORANGE);
+          WiFi.mode(WIFI_STA);
+          int n = WiFi.scanNetworks();
+          wifiScanCount = 0;
+          for (int i = 0; i < n && wifiScanCount < WIFI_SCAN_MAX; i++) {
+            wifiScanSSIDs[wifiScanCount] = WiFi.SSID(i);
+            wifiScanOpen[wifiScanCount] = (WiFi.encryptionType(i) == WIFI_AUTH_OPEN);
+            wifiScanCount++;
+          }
+          wifiScanPage = 0;
+          currentScreen = SCR_WIFI_SCAN;
+          drawWifiScan();
+        }
+        else if (hit(220, 176, 90, 34, tx, ty) && wifiConnected) {
+          WiFi.disconnect(true);
+          clearWifiCreds();
+          wifiConnected = false;
+          wifiCurrentSSID = "";
+          wifiCurrentIP = "";
+          drawWifi();
+        }
+        break;
+      }
+      case SCR_WIFI_SCAN: {
+        const int rowH = 26, gap = 2, x0 = 10, y0 = 30, rowW = W - 20;
+        const uint8_t perPage = 6;
+        uint8_t totalPages = wifiScanCount == 0 ? 1 : (wifiScanCount + perPage - 1) / perPage;
+
+        bool rowTapped = false;
+        for (uint8_t i = 0; i < perPage && !rowTapped; i++) {
+          uint8_t idx = wifiScanPage * perPage + i;
+          if (idx >= wifiScanCount) continue;
+          int y = y0 + i * (rowH + gap);
+          if (hit(x0, y, rowW, rowH, tx, ty)) {
+            kbTargetSSID = wifiScanSSIDs[idx];
+            if (wifiScanOpen[idx]) {
+              drawFooter("Connecting...", C_ORANGE);
+              bool ok = attemptWifiConnect(kbTargetSSID, "", 10000);
+              if (ok) saveWifiCreds(kbTargetSSID, "");
+              currentScreen = SCR_WIFI;
+              drawWifi();
+            } else {
+              kbBuffer = "";
+              kbIsPassword = true;
+              kbShift = false;
+              kbSymbols = false;
+              currentScreen = SCR_WIFI_KEYBOARD;
+              drawWifiKeyboard();
+            }
+            rowTapped = true;
+          }
+        }
+        if (!rowTapped) {
+          if (hit(10, 176, 90, 34, tx, ty)) {
+            currentScreen = SCR_WIFI;
+            drawWifi();
+          } else if (hit(115, 176, 90, 34, tx, ty)) {
+            wifiScanPage = (wifiScanPage == 0) ? totalPages - 1 : wifiScanPage - 1;
+            drawWifiScan();
+          } else if (hit(220, 176, 90, 34, tx, ty)) {
+            wifiScanPage = (wifiScanPage + 1) % totalPages;
+            drawWifiScan();
+          }
+        }
+        break;
+      }
+      case SCR_WIFI_KEYBOARD: {
+        const char* row1  = "1234567890";
+        const char* row2  = "QWERTYUIOP";
+        const char* row3  = "ASDFGHJKL";
+        const char* row4L = "ZXCVBNM";
+        const char* row2S = "!@#$%^&*()";
+        const char* row3S = "-_=+[]{};:";
+        const char* row4S = ",.<>/?~`";
+        const char* r2 = kbSymbols ? row2S : row2;
+        const char* r3 = kbSymbols ? row3S : row3;
+        const char* r4 = kbSymbols ? row4S : row4L;
+
+        bool keyTapped = false;
+        auto tryRow = [&](const char* chars, int y) {
+          if (keyTapped) return;
+          int count = strlen(chars);
+          int tileW = (W - 20) / count;
+          for (int i = 0; i < count; i++) {
+            int x = 10 + i * tileW;
+            if (hit(x, y, tileW - 1, 24, tx, ty)) {
+              char c = chars[i];
+              if (!kbSymbols) c = kbShift ? toupper(c) : tolower(c);
+              kbBuffer += c;
+              keyTapped = true;
+              return;
+            }
+          }
+        };
+        tryRow(row1, 60);
+        tryRow(r2, 86);
+        tryRow(r3, 112);
+        tryRow(r4, 138);
+
+        if (keyTapped) {
+          drawWifiKeyboard();
+        }
+        else if (hit(10, 176, 48, 34, tx, ty)) {
+          kbBuffer = "";
+          if (kbIsPassword) {
+            currentScreen = SCR_WIFI_SCAN;
+            drawWifiScan();
+          } else {
+            currentScreen = SCR_WIFI;
+            drawWifi();
+          }
+        }
+        else if (hit(60, 176, 48, 34, tx, ty)) {
+          kbShift = !kbShift;
+          drawWifiKeyboard();
+        }
+        else if (hit(110, 176, 48, 34, tx, ty)) {
+          kbSymbols = !kbSymbols;
+          drawWifiKeyboard();
+        }
+        else if (hit(160, 176, 80, 34, tx, ty)) {
+          kbBuffer += " ";
+          drawWifiKeyboard();
+        }
+        else if (hit(242, 176, 34, 34, tx, ty)) {
+          if (kbBuffer.length() > 0) kbBuffer.remove(kbBuffer.length() - 1);
+          drawWifiKeyboard();
+        }
+        else if (hit(278, 176, 32, 34, tx, ty)) {
+          if (kbIsPassword) {
+            drawFooter("Connecting...", C_ORANGE);
+            bool ok = attemptWifiConnect(kbTargetSSID, kbBuffer, 10000);
+            if (ok) saveWifiCreds(kbTargetSSID, kbBuffer);
+            kbBuffer = "";
+            currentScreen = SCR_WIFI;
+            drawWifi();
+          }
+        }
         break;
       }
       default:
@@ -2229,3 +2656,4 @@ break;
     delay(250);
   }
 }
+     
