@@ -38,6 +38,33 @@ int W, H;
 // ── Backlight ───────────────────────────────────────────────
 #define BL_PIN 21
 uint8_t backlightLevel = 255;   // 0-255, current PWM duty
+float touchXA = 10.9375f, touchXB = 200.0f;
+float touchYA = 14.5833f, touchYB = 200.0f;
+uint8_t touchCalStep = 0;
+int touchCalRawX[5], touchCalRawY[5];
+
+void getTouchCalPoint(uint8_t step, int &sx, int &sy) {
+  switch (step) {
+    case 0: sx = 20;     sy = 20;     break;
+    case 1: sx = W - 20; sy = 20;     break;
+    case 2: sx = 20;     sy = H - 20; break;
+    case 3: sx = W - 20; sy = H - 20; break;
+    default: sx = W / 2; sy = H / 2;  break;
+  }
+}
+
+void computeAxisFit(const int* screenPts, const int* rawPts, int n, float &A, float &B) {
+  double sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+  for (int i = 0; i < n; i++) {
+    sumX += screenPts[i]; sumY += rawPts[i];
+    sumXY += (double)screenPts[i] * rawPts[i];
+    sumXX += (double)screenPts[i] * screenPts[i];
+  }
+  double denom = n * sumXX - sumX * sumX;
+  if (denom == 0) { A = 1; B = 0; return; }
+  A = (n * sumXY - sumX * sumY) / denom;
+  B = (sumY - A * sumX) / n;
+}
 
 // ── Touch (VSPI) ────────────────────────────────────────────
 #define XPT2046_CLK  25
@@ -96,7 +123,10 @@ enum Screen {
   SCR_WIFI_KEYBOARD,
    SCR_SCREENSAVER,
    SCR_NFC_STATUS,
-   SCR_BACKLIGHT,
+  SCR_BACKLIGHT,
+   SCR_TOUCH_CAL,
+   SCR_FIRMWARE_INFO,
+   SCR_FACTORY_CONFIRM,
   SCR_NO_READER
 };
 Screen currentScreen = SCR_SPLASH;
@@ -1320,7 +1350,74 @@ void drawSettings() {
 
   drawFooter("K-9  mark 1  -  Built by Joe the Builder", C_MUTED);
 }
+void drawCrosshair(int cx, int cy, uint16_t color) {
+  tft.drawFastHLine(cx-10, cy, 20, color);
+  tft.drawFastVLine(cx, cy-10, 20, color);
+  tft.drawCircle(cx, cy, 6, color);
+}
 
+void drawTouchCal() {
+  tft.fillScreen(C_BG);
+  drawHeader("K-9 — Touch Calibration");
+  tft.setTextDatum(MC_DATUM);
+  tft.setTextColor(C_TEXT, C_BG);
+  char buf[24];
+  snprintf(buf, sizeof(buf), "Point %d of 5", touchCalStep + 1);
+  tft.drawString(buf, W/2, 30, 2);
+  int sx, sy;
+  getTouchCalPoint(touchCalStep, sx, sy);
+  drawCrosshair(sx, sy, C_ORANGE);
+}
+
+void drawFirmwareInfo() {
+  tft.fillScreen(C_BG);
+  drawHeader("K-9 — Firmware Info");
+
+  tft.fillRect(10, 30, W-20, 140, C_CARD);
+  tft.drawRect(10, 30, W-20, 140, C_ORANGE_D);
+  tft.setTextDatum(TL_DATUM);
+
+  tft.setTextColor(C_MUTED, C_CARD);
+  tft.drawString("VERSION", 18, 38, 1);
+  tft.setTextColor(C_ORANGE, C_CARD);
+  tft.drawString("K-9 mark 1  v0.0.0", 18, 50, 2);
+
+  tft.setTextColor(C_MUTED, C_CARD);
+  tft.drawString("CHIP", 18, 78, 1);
+  char chipBuf[40];
+  snprintf(chipBuf, sizeof(chipBuf), "%s rev %d", ESP.getChipModel(), ESP.getChipRevision());
+  tft.setTextColor(C_TEXT, C_CARD);
+  tft.drawString(chipBuf, 18, 90, 1);
+
+  tft.setTextColor(C_MUTED, C_CARD);
+  tft.drawString("FREE HEAP", 18, 108, 1);
+  char heapBuf[24];
+  snprintf(heapBuf, sizeof(heapBuf), "%u bytes", ESP.getFreeHeap());
+  tft.setTextColor(C_TEXT, C_CARD);
+  tft.drawString(heapBuf, 18, 120, 1);
+
+  tft.setTextColor(C_MUTED, C_CARD);
+  tft.drawString("FLASH", 18, 138, 1);
+  char flashBuf[24];
+  snprintf(flashBuf, sizeof(flashBuf), "%u MB", ESP.getFlashChipSize() / (1024*1024));
+  tft.setTextColor(C_TEXT, C_CARD);
+  tft.drawString(flashBuf, 18, 150, 1);
+
+  drawFooter("K-9  mark 1  -  Built by Joe the Builder", C_MUTED);
+  drawButton(10, 176, 300, 34, C_ORANGE_D, "BACK", C_TEXT);
+}
+
+void drawFactoryConfirm() {
+  tft.fillScreen(C_BG);
+  drawHeader("K-9 — Factory Reset");
+  tft.setTextDatum(MC_DATUM);
+  tft.setTextColor(C_RED, C_BG);
+  tft.drawString("Erase WiFi + settings?", W/2, 80, 2);
+  tft.setTextColor(C_MUTED, C_BG);
+  tft.drawString("This cannot be undone", W/2, 104, 1);
+  drawButton(10,  176, 145, 34, C_CARD, "CANCEL", C_TEXT);
+  drawButton(165, 176, 145, 34, C_RED,  "ERASE",  C_WHITE);
+}
 // ============================================================
 //  BACKLIGHT SCREEN
 // ============================================================
@@ -1932,6 +2029,12 @@ void setup() {
   backlightLevel = prefs.getUChar("backlight", 255);
   prefs.end();
   ledcWrite(BL_PIN, backlightLevel);
+  prefs.begin("k9settings", true);
+  touchXA = prefs.getFloat("txa", touchXA);
+  touchXB = prefs.getFloat("txb", touchXB);
+  touchYA = prefs.getFloat("tya", touchYA);
+  touchYB = prefs.getFloat("tyb", touchYB);
+  prefs.end();
 
   tft.fillScreen(C_BG);
 
@@ -2106,10 +2209,36 @@ void loop() {
   // Touch
   if (ts.tirqTouched() && ts.touched()) {
     TS_Point p = ts.getPoint();
-    int tx = map(p.x, 200, 3700, 0, W);
-    int ty = map(p.y, 200, 3700, 0, H);
+    int tx = (int)((p.x - touchXB) / touchXA);
+    int ty = (int)((p.y - touchYB) / touchYA);
+    if (tx < 0) tx = 0; if (tx >= W) tx = W - 1;
+    if (ty < 0) ty = 0; if (ty >= H) ty = H - 1;
     lastActivityMs = millis();
 
+    if (currentScreen == SCR_TOUCH_CAL) {
+      touchCalRawX[touchCalStep] = p.x;
+      touchCalRawY[touchCalStep] = p.y;
+      touchCalStep++;
+      if (touchCalStep >= 5) {
+        int screenX[5], screenY[5];
+        for (uint8_t i = 0; i < 5; i++) getTouchCalPoint(i, screenX[i], screenY[i]);
+        computeAxisFit(screenX, touchCalRawX, 5, touchXA, touchXB);
+        computeAxisFit(screenY, touchCalRawY, 5, touchYA, touchYB);
+        prefs.begin("k9settings", false);
+        prefs.putFloat("txa", touchXA);
+        prefs.putFloat("txb", touchXB);
+        prefs.putFloat("tya", touchYA);
+        prefs.putFloat("tyb", touchYB);
+        prefs.end();
+        touchCalStep = 0;
+        currentScreen = SCR_SETTINGS;
+        drawSettings();
+      } else {
+        drawTouchCal();
+      }
+      delay(250);
+      return;
+    }
     if (currentScreen == SCR_SCREENSAVER) {
       currentScreen = screensaverPrevScreen;
       switch (currentScreen) {
@@ -2789,12 +2918,44 @@ break;
           currentScreen = SCR_NFC_STATUS;
           drawNfcStatus();
         }
+        else if (hit(x, y0 + 3*(h+gap), w, h, tx, ty)) {
+          touchCalStep = 0;
+          currentScreen = SCR_TOUCH_CAL;
+          drawTouchCal();
+        }
+        else if (hit(x, y0 + 4*(h+gap), w, h, tx, ty)) {
+          currentScreen = SCR_FIRMWARE_INFO;
+          drawFirmwareInfo();
+        }
+        else if (hit(x, y0 + 5*(h+gap), w, h, tx, ty)) {
+          currentScreen = SCR_FACTORY_CONFIRM;
+          drawFactoryConfirm();
+        }
         else if (hit(x, y0 + 6*(h+gap), w, h, tx, ty)) {
           currentScreen = SCR_MAIN;
           drawMain();
         }
-        // Backlight / Touch Calibration / Firmware Info / Factory
-        // Reset rows are stubs for now — no action on tap yet.
+        break;
+      }
+      case SCR_FIRMWARE_INFO: {
+        if (hit(10, 176, 300, 34, tx, ty)) {
+          currentScreen = SCR_SETTINGS;
+          drawSettings();
+        }
+        break;
+      }
+      case SCR_FACTORY_CONFIRM: {
+        if (hit(10, 176, 145, 34, tx, ty)) {
+          currentScreen = SCR_SETTINGS;
+          drawSettings();
+        }
+        else if (hit(165, 176, 145, 34, tx, ty)) {
+          drawFooter("Erasing...", C_RED);
+          prefs.begin("k9wifi", false); prefs.clear(); prefs.end();
+          prefs.begin("k9settings", false); prefs.clear(); prefs.end();
+          delay(800);
+          ESP.restart();
+        }
         break;
       }
      case SCR_BACKLIGHT: {
