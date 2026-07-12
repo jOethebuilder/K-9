@@ -37,6 +37,7 @@ int W, H;
 
 // ── Backlight ───────────────────────────────────────────────
 #define BL_PIN 21
+uint8_t backlightLevel = 255;   // 0-255, current PWM duty
 
 // ── Touch (VSPI) ────────────────────────────────────────────
 #define XPT2046_CLK  25
@@ -52,6 +53,12 @@ XPT2046_Touchscreen ts(XPT2046_CS, XPT2046_IRQ);
 #define PN532_SCL 22
 Adafruit_PN532 nfc(PN532_SDA, PN532_SCL);
 bool nfcReady = false;
+uint32_t nfcFirmwareVersion = 0;
+
+enum NfcTestResult { NFC_TEST_NONE, NFC_TEST_FOUND, NFC_TEST_NOT_FOUND };
+NfcTestResult nfcTestResult = NFC_TEST_NONE;
+uint8_t nfcTestUid[7];
+uint8_t nfcTestUidLen = 0;
 
 // ── Colors (RGB565) ─────────────────────────────────────────
 #define C_BG       0x10A2
@@ -77,6 +84,7 @@ enum Screen {
    SCR_ANYCUBIC_ENTRY,
    SCR_ANYCUBIC_MATERIAL_PICKER,
    SCR_ANYCUBIC_COLOR_PICKER,
+     SCR_ANYCUBIC_CUSTOM_COLOR,
    SCR_OPENSPOOL_MATERIAL_PICKER,
    SCR_OPENSPOOL_MANUFACTURER_PICKER,
    SCR_OPENSPOOL_COLOR_PICKER,
@@ -86,6 +94,9 @@ enum Screen {
   SCR_WIFI,
   SCR_WIFI_SCAN,
   SCR_WIFI_KEYBOARD,
+   SCR_SCREENSAVER,
+   SCR_NFC_STATUS,
+   SCR_BACKLIGHT,
   SCR_NO_READER
 };
 Screen currentScreen = SCR_SPLASH;
@@ -300,7 +311,10 @@ int     aceEntryBedMin = OS_MATERIALS[0].bedMin;
 int     aceEntryBedMax = OS_MATERIALS[0].bedMax;
 int     aceEntryNozMin = OS_MATERIALS[0].nozzleMin;
 int     aceEntryNozMax = OS_MATERIALS[0].nozzleMax;
-uint8_t aceEntryColIdx = 0;   // index into ANYCUBIC_COLORS (0..34)
+uint8_t aceEntryColIdx = 0;   // index into ANYCUBIC_COLORS (0..34) - currently highlighted preset
+bool    aceEntryIsCustom = false;  // true if using aceCustomR/G/B/A instead of a preset
+uint8_t aceCustomR = 0, aceCustomG = 0, aceCustomB = 255;
+uint8_t aceWriteAlpha = 255;  // actual alpha byte written to the tag
 bool    aceEntryShowingRead = false;
 uint8_t aceMaterialPickerPage = 0;
 uint8_t aceColorPickerPage = 0;
@@ -334,6 +348,13 @@ String kbTargetSSID = "";
 bool   kbIsPassword = false;
 bool   kbShift      = false;
 bool   kbSymbols    = false;
+
+// ── Screensaver ─────────────────────────────────────────────
+unsigned long lastActivityMs = 0;
+const unsigned long SCREENSAVER_TIMEOUT_MS = 60000; // 60 seconds
+Screen screensaverPrevScreen = SCR_MAIN;
+int ssX = 40, ssY = 40, ssVX = 2, ssVY = 2;
+unsigned long lastSSFrameMs = 0;
 // ============================================================
 //  NFC HELPERS
 // ============================================================
@@ -461,6 +482,14 @@ bool attemptWifiConnect(const String& ssid, const String& pass, uint32_t timeout
 // ============================================================
 //  DRAW HELPERS
 // ============================================================
+uint16_t getContrastColorLocal(uint16_t bg565) {
+  uint8_t r = (bg565 >> 11) & 0x1F;
+  uint8_t g = (bg565 >> 5)  & 0x3F;
+  uint8_t b = bg565 & 0x1F;
+  float luminance = (0.299f * (r << 3) + 0.587f * (g << 2) + 0.114f * (b << 3)) / 255.0f;
+  return (luminance > 0.5f) ? C_BLACK : C_WHITE;
+}
+
 bool hit(int bx, int by, int bw, int bh, int tx, int ty) {
   return tx >= bx && tx <= bx + bw && ty >= by && ty <= by + bh;
 }
@@ -854,14 +883,16 @@ void drawAnycubicEntry() {
     tft.setTextDatum(TL_DATUM);
     tft.setTextColor(C_MUTED, C_CARD);
     tft.drawString("COLOR — tap to change", 54, 112, 1);
-    uint16_t curSw = tft.color565(ANYCUBIC_COLORS[aceEntryColIdx][0], ANYCUBIC_COLORS[aceEntryColIdx][1], ANYCUBIC_COLORS[aceEntryColIdx][2]);
+    uint8_t curR = aceEntryIsCustom ? aceCustomR : ANYCUBIC_COLORS[aceEntryColIdx][0];
+    uint8_t curG = aceEntryIsCustom ? aceCustomG : ANYCUBIC_COLORS[aceEntryColIdx][1];
+    uint8_t curB = aceEntryIsCustom ? aceCustomB : ANYCUBIC_COLORS[aceEntryColIdx][2];
+    uint16_t curSw = tft.color565(curR, curG, curB);
     tft.fillRect(14, 116, 32, 22, curSw);
     tft.drawRect(14, 116, 32, 22, C_ORANGE_D);
     tft.setTextDatum(MC_DATUM);
     tft.setTextColor(C_ORANGE, C_CARD);
     char aceEntryHex[10];
-    snprintf(aceEntryHex, sizeof(aceEntryHex), "FF%02X%02X%02X",
-             ANYCUBIC_COLORS[aceEntryColIdx][0], ANYCUBIC_COLORS[aceEntryColIdx][1], ANYCUBIC_COLORS[aceEntryColIdx][2]);
+    snprintf(aceEntryHex, sizeof(aceEntryHex), "%02X%02X%02X%02X", aceWriteAlpha, curR, curG, curB);
     tft.drawString(aceEntryHex, W/2 + 20, 130, 1);
   }
   drawFooter("K-9  mark 1  -  Built by Joe the Builder", C_MUTED);
@@ -878,6 +909,45 @@ void drawAnycubicEntry() {
 // ============================================================
 //  ANYCUBIC MATERIAL PICKER — paged grid, tap tile to select
 // ============================================================
+// ============================================================
+//  ANYCUBIC CUSTOM COLOR — A/R/G/B steppers, live swatch + hex
+// ============================================================
+void drawAnycubicCustomColor() {
+  tft.fillScreen(C_BG);
+  drawHeader("K-9 — Customize Color");
+
+  uint16_t sw = tft.color565(aceCustomR, aceCustomG, aceCustomB);
+  tft.fillRect(90, 28, 140, 30, sw);
+  tft.drawRect(90, 28, 140, 30, C_ORANGE_D);
+  char hexBuf[10];
+  snprintf(hexBuf, sizeof(hexBuf), "FF%02X%02X%02X", aceCustomR, aceCustomG, aceCustomB);
+  tft.setTextDatum(MC_DATUM);
+  tft.setTextColor(getContrastColorLocal(sw), sw);
+  tft.drawString(hexBuf, W/2, 43, 2);
+
+  auto channelRow = [&](int y, const char* label, uint8_t value) {
+    tft.fillRect(10, y, W-20, 28, C_CARD);
+    tft.drawRect(10, y, W-20, 28, C_ORANGE_D);
+    tft.setTextDatum(TL_DATUM);
+    tft.setTextColor(C_MUTED, C_CARD);
+    tft.drawString(label, 44, y + 2, 1);
+    char valBuf[8];
+    snprintf(valBuf, sizeof(valBuf), "%d", value);
+    tft.setTextDatum(MC_DATUM);
+    tft.setTextColor(C_ORANGE, C_CARD);
+    tft.drawString(valBuf, W/2, y + 18, 2);
+    drawButton(10, y, 26, 28, C_ORANGE_D, "-", C_TEXT);
+    drawButton(W-36, y, 26, 28, C_ORANGE_D, "+", C_TEXT);
+  };
+
+  
+  channelRow(96,  "RED",   aceCustomR);
+  channelRow(128, "GREEN", aceCustomG);
+  channelRow(160, "BLUE",  aceCustomB);
+
+  drawButton(10,  198, 145, 32, C_CARD,  "BACK", C_TEXT);
+  drawButton(165, 198, 145, 32, C_GREEN, "OK",   C_BLACK);
+}
 void drawAnycubicMaterialPicker() {
   tft.fillScreen(C_BG);
   drawHeader("K-9 — Select Material");
@@ -916,6 +986,7 @@ void drawAnycubicMaterialPicker() {
 // ============================================================
 //  ANYCUBIC COLOR PICKER — paged grid, tap swatch to select
 // ============================================================
+
 void drawAnycubicColorPicker() {
   tft.fillScreen(C_BG);
   drawHeader("K-9 — Select Color");
@@ -937,7 +1008,7 @@ void drawAnycubicColorPicker() {
     int y = y0 + row * (tileH + gap);
     uint16_t sw = tft.color565(ANYCUBIC_COLORS[colIdx][0], ANYCUBIC_COLORS[colIdx][1], ANYCUBIC_COLORS[colIdx][2]);
     tft.fillRect(x, y, tileW, tileH, sw);
-    if (colIdx == aceEntryColIdx) {
+    if (!aceEntryIsCustom && colIdx == aceEntryColIdx) {
       tft.drawRect(x, y, tileW, tileH, C_WHITE);
       tft.drawRect(x+1, y+1, tileW-2, tileH-2, C_WHITE);
     } else {
@@ -949,11 +1020,12 @@ void drawAnycubicColorPicker() {
   snprintf(pageBuf, sizeof(pageBuf), "Page %d / %d", aceColorPickerPage + 1, totalPages);
   drawFooter(pageBuf, C_MUTED);
 
-  drawButton(10,  176, 90, 34, C_CARD,     "BACK", C_TEXT);
-  drawButton(115, 176, 90, 34, C_ORANGE_D, "<",    C_TEXT);
-  drawButton(220, 176, 90, 34, C_ORANGE_D, ">",    C_TEXT);
+  drawButton(10,  176, 58, 34, C_CARD,     "BACK", C_TEXT);
+  drawButton(70,  176, 58, 34, C_ORANGE_D, "<",    C_TEXT);
+  drawButton(130, 176, 58, 34, C_ORANGE_D, ">",    C_TEXT);
+  drawButton(190, 176, 58, 34, C_GREEN,    "WRITE", C_BLACK);
+  drawButton(250, 176, 60, 34, C_ORANGE,   "CUSTOM", C_BLACK);
 }
-
 void drawOpenSpoolMaterialPicker() {
   tft.fillScreen(C_BG);
   drawHeader("K-9 — Select Material");
@@ -1250,6 +1322,95 @@ void drawSettings() {
 }
 
 // ============================================================
+//  BACKLIGHT SCREEN
+// ============================================================
+void drawBacklight() {
+  tft.fillScreen(C_BG);
+  drawHeader("K-9 — Backlight");
+
+  tft.setTextDatum(MC_DATUM);
+  tft.setTextColor(C_MUTED, C_BG);
+  char curBuf[24];
+  int pct = (backlightLevel * 100) / 255;
+  snprintf(curBuf, sizeof(curBuf), "Current: %d%%", pct);
+  tft.drawString(curBuf, W/2, 50, 2);
+
+  const int btnW = 140, btnH = 40, gapX = 20, gapY = 10, x0 = 20, y0 = 72;
+  auto levelButton = [&](int x, int y, uint8_t level, const char* label) {
+    bool active = (backlightLevel == level);
+    drawButton(x, y, btnW, btnH, active ? C_ORANGE : C_CARD, label, active ? C_BLACK : C_TEXT);
+  };
+
+  levelButton(x0,             y0,             64,  "25%");
+  levelButton(x0 + btnW+gapX, y0,             128, "50%");
+  levelButton(x0,             y0 + btnH+gapY, 191, "75%");
+  levelButton(x0 + btnW+gapX, y0 + btnH+gapY, 255, "100%");
+
+  drawFooter("K-9  mark 1  -  Built by Joe the Builder", C_MUTED);
+
+  drawButton(10, 180, 300, 34, C_ORANGE_D, "BACK", C_TEXT);
+}
+
+// ============================================================
+//  NFC STATUS SCREEN
+// ============================================================
+void drawNfcStatus() {
+  tft.fillScreen(C_BG);
+  drawHeader("K-9 — NFC Status");
+
+  tft.fillRect(10, 30, W-20, 100, C_CARD);
+  tft.drawRect(10, 30, W-20, 100, C_ORANGE_D);
+  tft.setTextDatum(TL_DATUM);
+  tft.setTextColor(C_MUTED, C_CARD);
+  tft.drawString("READER", 18, 38, 1);
+
+  tft.setTextDatum(MC_DATUM);
+  if (nfcReady) {
+    tft.setTextColor(C_GREEN, C_CARD);
+    tft.drawString("CONNECTED", W/2, 58, 2);
+    char verBuf[32];
+    uint8_t chip = (nfcFirmwareVersion >> 24) & 0xFF;
+    uint8_t fwMaj = (nfcFirmwareVersion >> 16) & 0xFF;
+    uint8_t fwMin = (nfcFirmwareVersion >> 8) & 0xFF;
+    snprintf(verBuf, sizeof(verBuf), "PN5%02X  FW %d.%d", chip, fwMaj, fwMin);
+    tft.setTextColor(C_TEXT, C_CARD);
+    tft.drawString(verBuf, W/2, 80, 1);
+  } else {
+    tft.setTextColor(C_RED, C_CARD);
+    tft.drawString("NOT CONNECTED", W/2, 70, 2);
+  }
+
+  tft.setTextDatum(TL_DATUM);
+  tft.setTextColor(C_MUTED, C_CARD);
+  tft.drawString("SCAN TEST RESULT", 18, 100, 1);
+  tft.setTextDatum(MC_DATUM);
+  if (nfcTestResult == NFC_TEST_FOUND) {
+    tft.setTextColor(C_GREEN, C_CARD);
+    String uid = "";
+    for (uint8_t i = 0; i < nfcTestUidLen; i++) {
+      if (nfcTestUid[i] < 0x10) uid += "0";
+      uid += String(nfcTestUid[i], HEX);
+      if (i < nfcTestUidLen - 1) uid += ":";
+    }
+    uid.toUpperCase();
+    char foundBuf[40];
+    snprintf(foundBuf, sizeof(foundBuf), "TAG FOUND  %s", uid.c_str());
+    tft.drawString(foundBuf, W/2, 118, 1);
+  } else if (nfcTestResult == NFC_TEST_NOT_FOUND) {
+    tft.setTextColor(C_RED, C_CARD);
+    tft.drawString("NO TAG DETECTED", W/2, 118, 1);
+  } else {
+    tft.setTextColor(C_MUTED, C_CARD);
+    tft.drawString("Not tested yet", W/2, 118, 1);
+  }
+
+  drawFooter("K-9  mark 1  -  Built by Joe the Builder", C_MUTED);
+
+  drawButton(10,  176, 145, 34, C_CARD,     "BACK",      C_TEXT);
+  drawButton(165, 176, 145, 34, C_ORANGE_D, "SCAN TEST", C_TEXT);
+}
+
+// ============================================================
 //  WIFI STATUS SCREEN
 // ============================================================
 void drawWifi() {
@@ -1465,7 +1626,7 @@ bool aceWriteTag() {
     if (!writeNfcPage(15 + p, page)) return false;
   }
 
-  page[0] = 0xFF;
+  page[0] = aceWriteAlpha;
   page[1] = tagData.b;
   page[2] = tagData.g;
   page[3] = tagData.r;
@@ -1730,6 +1891,31 @@ bool openSpoolWriteTag() {
 }
 
 // ============================================================
+//  SCREENSAVER
+// ============================================================
+void enterScreensaver() {
+  ssX = random(20, W - 60);
+  ssY = random(20, H - 40);
+  ssVX = (random(0, 2) == 0) ? 2 : -2;
+  ssVY = (random(0, 2) == 0) ? 2 : -2;
+  tft.fillScreen(C_BLACK);
+  lastSSFrameMs = millis();
+}
+
+void drawScreensaverFrame() {
+  ssX += ssVX;
+  ssY += ssVY;
+  if (ssX <= 0 || ssX >= W - 60) ssVX = -ssVX;
+  if (ssY <= 0 || ssY >= H - 40) ssVY = -ssVY;
+  tft.fillScreen(C_BLACK);
+  tft.setTextDatum(TL_DATUM);
+  tft.setTextColor(C_ORANGE, C_BLACK);
+  tft.setTextSize(3);
+  tft.drawString("K-9", ssX, ssY);
+  tft.setTextSize(1);
+}
+
+// ============================================================
 //  SETUP
 // ============================================================
 void setup() {
@@ -1742,7 +1928,10 @@ void setup() {
   H = tft.height();
 
   ledcAttach(BL_PIN, 5000, 8);
-  ledcWrite(BL_PIN, 255);
+  prefs.begin("k9settings", true);
+  backlightLevel = prefs.getUChar("backlight", 255);
+  prefs.end();
+  ledcWrite(BL_PIN, backlightLevel);
 
   tft.fillScreen(C_BG);
 
@@ -1756,6 +1945,7 @@ void setup() {
   Wire.begin(PN532_SDA, PN532_SCL);
   nfc.begin();
   uint32_t ver = nfc.getFirmwareVersion();
+  nfcFirmwareVersion = ver;
   if (!ver) {
     Serial.println("[WARN] PN532 not found");
     nfcReady = false;
@@ -1776,12 +1966,26 @@ void setup() {
   if (loadWifiCreds(savedSsid, savedPass)) {
     attemptWifiConnect(savedSsid, savedPass, 8000);
   }
+
+  lastActivityMs = millis();
 }
 
 // ============================================================
 //  LOOP
 // ============================================================
 void loop() {
+
+  // Screensaver: enter after inactivity, animate while active
+  if (currentScreen != SCR_SCREENSAVER && currentScreen != SCR_SPLASH && currentScreen != SCR_NO_READER &&
+      millis() - lastActivityMs > SCREENSAVER_TIMEOUT_MS) {
+    screensaverPrevScreen = currentScreen;
+    currentScreen = SCR_SCREENSAVER;
+    enterScreensaver();
+  }
+  if (currentScreen == SCR_SCREENSAVER && millis() - lastSSFrameMs > 40) {
+    drawScreensaverFrame();
+    lastSSFrameMs = millis();
+  }
 
   // Auto scan on QIDI screen
   // Tracks tag presence (qidiTagPresent) so it: (1) reads once per tag placement
@@ -1904,6 +2108,25 @@ void loop() {
     TS_Point p = ts.getPoint();
     int tx = map(p.x, 200, 3700, 0, W);
     int ty = map(p.y, 200, 3700, 0, H);
+    lastActivityMs = millis();
+
+    if (currentScreen == SCR_SCREENSAVER) {
+      currentScreen = screensaverPrevScreen;
+      switch (currentScreen) {
+        case SCR_MAIN:            drawMain(); break;
+        case SCR_QIDI:            drawSubMenu("K-9 — QIDI"); break;
+        case SCR_OPENSPOOL:       drawSubMenu("K-9 — OpenSpool U1"); break;
+        case SCR_ANYCUBIC:        drawSubMenu("K-9 — Anycubic"); break;
+        case SCR_QIDI_ENTRY:      drawQidiEntry(); break;
+        case SCR_OPENSPOOL_ENTRY: drawOpenSpoolEntry(); break;
+        case SCR_ANYCUBIC_ENTRY:  drawAnycubicEntry(); break;
+        case SCR_SETTINGS:        drawSettings(); break;
+        case SCR_WIFI:            drawWifi(); break;
+        default:                  currentScreen = SCR_MAIN; drawMain(); break;
+      }
+      delay(250);
+      return;
+    }
 
     switch (currentScreen) {
 
@@ -2013,9 +2236,7 @@ case SCR_QIDI:
     aceEntryShowingRead = false;
     strncpy(tagData.manufacturer, "AC", sizeof(tagData.manufacturer));
     strncpy(tagData.material, OS_MATERIALS[aceEntryMatIdx].name, sizeof(tagData.material));
-    tagData.r = ANYCUBIC_COLORS[aceEntryColIdx][0];
-    tagData.g = ANYCUBIC_COLORS[aceEntryColIdx][1];
-    tagData.b = ANYCUBIC_COLORS[aceEntryColIdx][2];
+    
     snprintf(tagData.color, sizeof(tagData.color), "FF%02X%02X%02X", tagData.r, tagData.g, tagData.b);
     tagData.extMin = aceEntryNozMin; tagData.extMax = aceEntryNozMax;
     tagData.bedMin = aceEntryBedMin; tagData.bedMax = aceEntryBedMax;
@@ -2053,7 +2274,12 @@ case SCR_QIDI:
     }
     drawAnycubicEntry();
     if (aceEntryShowingRead) {
-      delay(1800);
+      uint32_t holdStart = millis();
+      uint8_t stillUid[7]; uint8_t stillLen;
+      while (nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, stillUid, &stillLen, 150) &&
+             millis() - holdStart < 30000) {
+        delay(150);
+      }
       aceEntryShowingRead = false;
       drawAnycubicEntry();
     }
@@ -2117,23 +2343,68 @@ break;
           int y = y0 + row * (tileH + gap);
           if (hit(x, y, tileW, tileH, tx, ty)) {
             aceEntryColIdx = colIdx;
-            currentScreen = SCR_ANYCUBIC_ENTRY;
-            drawAnycubicEntry();
+            aceEntryIsCustom = false;
+            drawAnycubicColorPicker();
             tileTapped = true;
           }
         }
 
         if (!tileTapped) {
-          if (hit(10, 176, 90, 34, tx, ty)) {
+          if (hit(10, 176, 58, 34, tx, ty)) {
             currentScreen = SCR_ANYCUBIC_ENTRY;
             drawAnycubicEntry();
-          } else if (hit(115, 176, 90, 34, tx, ty)) {
+          } else if (hit(70, 176, 58, 34, tx, ty)) {
             aceColorPickerPage = (aceColorPickerPage == 0) ? totalPages - 1 : aceColorPickerPage - 1;
             drawAnycubicColorPicker();
-          } else if (hit(220, 176, 90, 34, tx, ty)) {
+          } else if (hit(130, 176, 58, 34, tx, ty)) {
             aceColorPickerPage = (aceColorPickerPage + 1) % totalPages;
             drawAnycubicColorPicker();
+          } else if (hit(190, 176, 58, 34, tx, ty)) {
+            aceEntryIsCustom = false;
+            aceWriteAlpha = 255;
+            currentScreen = SCR_ANYCUBIC_ENTRY;
+            drawAnycubicEntry();
+          } else if (hit(250, 176, 60, 34, tx, ty)) {
+            aceCustomR = ANYCUBIC_COLORS[aceEntryColIdx][0];
+            aceCustomG = ANYCUBIC_COLORS[aceEntryColIdx][1];
+            aceCustomB = ANYCUBIC_COLORS[aceEntryColIdx][2];
+            currentScreen = SCR_ANYCUBIC_CUSTOM_COLOR;
+            drawAnycubicCustomColor();
           }
+        }
+        break;
+      }
+      case SCR_ANYCUBIC_CUSTOM_COLOR: {
+        if (hit(10, 96, 26, 28, tx, ty)) {
+          aceCustomR = (aceCustomR >= 8) ? aceCustomR - 8 : 0;
+          drawAnycubicCustomColor();
+        } else if (hit(W-36, 96, 26, 28, tx, ty)) {
+          aceCustomR = (aceCustomR <= 247) ? aceCustomR + 8 : 255;
+          drawAnycubicCustomColor();
+        }
+        else if (hit(10, 128, 26, 28, tx, ty)) {
+          aceCustomG = (aceCustomG >= 8) ? aceCustomG - 8 : 0;
+          drawAnycubicCustomColor();
+        } else if (hit(W-36, 128, 26, 28, tx, ty)) {
+          aceCustomG = (aceCustomG <= 247) ? aceCustomG + 8 : 255;
+          drawAnycubicCustomColor();
+        }
+        else if (hit(10, 160, 26, 28, tx, ty)) {
+          aceCustomB = (aceCustomB >= 8) ? aceCustomB - 8 : 0;
+          drawAnycubicCustomColor();
+        } else if (hit(W-36, 160, 26, 28, tx, ty)) {
+          aceCustomB = (aceCustomB <= 247) ? aceCustomB + 8 : 255;
+          drawAnycubicCustomColor();
+        }
+        else if (hit(10, 198, 145, 32, tx, ty)) {
+          currentScreen = SCR_ANYCUBIC_COLOR_PICKER;
+          drawAnycubicColorPicker();
+        }
+        else if (hit(165, 198, 145, 32, tx, ty)) {
+          aceEntryIsCustom = true;
+          aceWriteAlpha = 255;
+          currentScreen = SCR_ANYCUBIC_ENTRY;
+          drawAnycubicEntry();
         }
         break;
       }
@@ -2315,7 +2586,12 @@ break;
           }
           drawOpenSpoolEntry();
           if (osEntryShowingRead) {
-            delay(1800);
+            uint32_t holdStart = millis();
+            uint8_t stillUid[7]; uint8_t stillLen;
+            while (nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, stillUid, &stillLen, 150) &&
+                   millis() - holdStart < 30000) {
+              delay(150);
+            }
             osEntryShowingRead = false;
             drawOpenSpoolEntry();
           }
@@ -2479,12 +2755,17 @@ break;
             delay(1200);
             qidiEntryShowingRead = false;
           }
-          drawQidiEntry();
+         drawQidiEntry();
           if (qidiEntryShowingRead) {
-            delay(1800);
+            uint32_t holdStart = millis();
+            uint8_t stillUid[7]; uint8_t stillLen;
+            while (nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, stillUid, &stillLen, 150) &&
+                   millis() - holdStart < 30000) {
+              delay(150);
+            }
             qidiEntryShowingRead = false;
             drawQidiEntry();
-          }
+          } 
         }
      break;
       }
@@ -2495,12 +2776,69 @@ break;
           currentScreen = SCR_WIFI;
           drawWifi();
         }
+        else if (hit(x, y0 + 1*(h+gap), w, h, tx, ty)) {
+          currentScreen = SCR_BACKLIGHT;
+          drawBacklight();
+        }
+       else if (hit(x, y0 + 1*(h+gap), w, h, tx, ty)) {
+          currentScreen = SCR_BACKLIGHT;
+          drawBacklight();
+        }
+        else if (hit(x, y0 + 2*(h+gap), w, h, tx, ty)) {
+          nfcTestResult = NFC_TEST_NONE;
+          currentScreen = SCR_NFC_STATUS;
+          drawNfcStatus();
+        }
         else if (hit(x, y0 + 6*(h+gap), w, h, tx, ty)) {
           currentScreen = SCR_MAIN;
           drawMain();
         }
-        // Backlight / NFC Status / Touch Calibration / Firmware Info / Factory
+        // Backlight / Touch Calibration / Firmware Info / Factory
         // Reset rows are stubs for now — no action on tap yet.
+        break;
+      }
+     case SCR_BACKLIGHT: {
+        const int btnW = 140, btnH = 40, gapX = 20, gapY = 10, x0 = 20, y0 = 72;
+        auto setLevel = [&](uint8_t level) {
+          backlightLevel = level;
+          ledcWrite(BL_PIN, backlightLevel);
+          prefs.begin("k9settings", false);
+          prefs.putUChar("backlight", backlightLevel);
+          prefs.end();
+          drawBacklight();
+        };
+
+        if (hit(x0, y0, btnW, btnH, tx, ty)) {
+          setLevel(64);
+        } else if (hit(x0 + btnW+gapX, y0, btnW, btnH, tx, ty)) {
+          setLevel(128);
+        } else if (hit(x0, y0 + btnH+gapY, btnW, btnH, tx, ty)) {
+          setLevel(191);
+        } else if (hit(x0 + btnW+gapX, y0 + btnH+gapY, btnW, btnH, tx, ty)) {
+          setLevel(255);
+        } else if (hit(10, 180, 300, 34, tx, ty)) {
+          currentScreen = SCR_SETTINGS;
+          drawSettings();
+        }
+        break;
+      }
+      case SCR_NFC_STATUS: {
+        if (hit(10, 176, 145, 34, tx, ty)) {
+          currentScreen = SCR_SETTINGS;
+          drawSettings();
+        }
+        else if (hit(165, 176, 145, 34, tx, ty)) {
+          drawFooter("Hold tag near reader...", C_ORANGE);
+          uint8_t uid[7]; uint8_t uidLen;
+          if (nfcReady && waitForTag(uid, &uidLen, 3000)) {
+            memcpy(nfcTestUid, uid, uidLen);
+            nfcTestUidLen = uidLen;
+            nfcTestResult = NFC_TEST_FOUND;
+          } else {
+            nfcTestResult = NFC_TEST_NOT_FOUND;
+          }
+          drawNfcStatus();
+        }
         break;
       }
       case SCR_WIFI: {
