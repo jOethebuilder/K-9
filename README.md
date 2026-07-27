@@ -18,12 +18,8 @@ K-9 is a dedicated spool management tool designed to:
 
 ## Getting Started
 
-1. **Flash the firmware** — use the [Web Installer](https://joethebuilder.github.io/K-9/web-flasher/) (Chrome or Edge only). Plug the board in over USB, click Install, follow the prompts. No Arduino IDE needed.
-
-   
+1. **Flash the firmware** — use the [Web Installer](https://joethebuilder.github.io/K-9/web-flasher/) (Chrome or Edge only). Plug the board in over USB, click Install, follow the prompts. No Arduino IDE needed.  
 ![Web Installer](images/web-installer-1.png)
-
-
 3. **Connect WiFi** — Settings → WIFI → SCAN → tap your network → enter password if prompted. Credentials are saved and reconnect automatically after that.
 4. **(Optional) Connect a Snapmaker U1** — Settings → U1 CONNECTION → enter your U1's IP address → TEST CONNECTION to confirm. Only needed if you want to use the SEND feature (see below).
 5. **Pick a protocol from the Main menu** — QIDI, OpenSpool U1, or Anycubic — and follow the on-screen prompts to read or write a tag.
