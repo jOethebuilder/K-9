@@ -3,6 +3,8 @@ ESP32 RFID spool management system for 3D printing (K-9 project)
 
 ---
 
+> **Note on screenshots below**: these are mockups generated directly from the firmware's actual layout coordinates and colors — not real device photos yet. Will be swapped for real photos as they're taken.
+
 ## What This Is
 
 K-9 is a dedicated spool management tool designed to:
@@ -16,6 +18,9 @@ K-9 is a dedicated spool management tool designed to:
 
 ## Getting Started
 
+![Main Menu](images/main-menu.png)
+*Mockup rendered from the firmware's actual layout/colors — not a device photo yet.*
+
 1. **Flash the firmware** — use the [Web Installer](https://joethebuilder.github.io/K-9/web-flasher/) (Chrome or Edge only). Plug the board in over USB, click Install, follow the prompts. No Arduino IDE needed.
 2. **Connect WiFi** — Settings → WIFI → SCAN → tap your network → enter password if prompted. Credentials are saved and reconnect automatically after that.
 3. **(Optional) Connect a Snapmaker U1** — Settings → U1 CONNECTION → enter your U1's IP address → TEST CONNECTION to confirm. Only needed if you want to use the SEND feature (see below).
@@ -26,13 +31,26 @@ K-9 is a dedicated spool management tool designed to:
 ## Current Support
 
 - **QIDI** — Mifare Classic 1K/4K, discrete color/material codes. Read/write confirmed working.
+
+  ![QIDI Screen](images/qidi-screen.png)
+
 - **OpenSpool U1** — NTAG215, NDEF JSON, compatible with the Snapmaker U1's built-in OpenRFID tag reader. Read/write confirmed working.
+
+  ![OpenSpool Entry](images/openspool-entry.png)
+
 - **Anycubic ACE** — NTAG215 raw-block format, full 35-color preset system. Read/write confirmed working.
+
+  ![Anycubic Entry](images/anycubic-entry.png)
+
 - **U1 SEND** — push filament data (manufacturer/material/color) straight to a Snapmaker U1 ToolHead slot (1–4) over WiFi, no tag required. See the note below before relying on this.
+
+  ![U1 Slot Picker](images/u1-slot-picker.png)
 
 ---
 
 ## U1 SEND — Read This First
+
+![U1 Connection Screen](images/u1-connection.png)
 
 If your Snapmaker U1 is set to **OpenRFID** filament detection mode (Firmware Config → Filament Detection), SEND will be rejected with an error like `filament_config, official filament, not configurable!` on any slot where the printer has already detected and locked in a real tag as "official." SEND currently works reliably on **empty slots** with no tag actively detected. Switching your U1 to **External** mode removes this conflict, but disables the printer's own automatic tag detection entirely — a real tradeoff, not a quick fix. Full detail: `docs/protocols/u1-moonraker-macros.md`.
 
