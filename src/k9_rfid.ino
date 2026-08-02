@@ -22,6 +22,7 @@
 #include <WiFi.h>
 #include <esp_wifi.h>
 #include <Preferences.h>
+#include <HTTPClient.h>
 
 // Compatibility with newer ESP32 board packages (core 3.x) that dropped these
 #ifndef VSPI
@@ -107,6 +108,7 @@ enum Screen {
    SCR_QIDI_ENTRY,
   SCR_OPENSPOOL,
   SCR_OPENSPOOL_ENTRY,
+  SCR_OPENSPOOL_SLOT_PICKER,
   SCR_ANYCUBIC,
    SCR_ANYCUBIC_ENTRY,
    SCR_ANYCUBIC_MATERIAL_PICKER,
@@ -115,6 +117,7 @@ enum Screen {
    SCR_OPENSPOOL_MATERIAL_PICKER,
    SCR_OPENSPOOL_MANUFACTURER_PICKER,
    SCR_OPENSPOOL_COLOR_PICKER,
+   SCR_OPENSPOOL_SUBTYPE_PICKER,
    SCR_QIDI_MATERIAL_PICKER,
    SCR_QIDI_COLOR_PICKER,
   SCR_SETTINGS,
@@ -124,6 +127,7 @@ enum Screen {
    SCR_SCREENSAVER,
    SCR_NFC_STATUS,
   SCR_BACKLIGHT,
+  SCR_U1_CONNECTION,
    SCR_TOUCH_CAL,
    SCR_FIRMWARE_INFO,
    SCR_FACTORY_CONFIRM,
@@ -314,6 +318,24 @@ const OsMaterial OS_MATERIALS[] = {
   { "PA-CF",   250, 280,  70, 100 },
 };
 const uint8_t OS_MATERIALS_COUNT = sizeof(OS_MATERIALS) / sizeof(OS_MATERIALS[0]);
+
+// Subtypes only apply to PLA (index 0) and PETG (index 1) in OS_MATERIALS.
+// Everything else has no subtype step and is silently treated as "Basic".
+const char* PLA_SUBTYPES[]  = { "Basic", "Matte", "Silk", "Wood", "Metallic", "CF" };
+const uint8_t PLA_SUBTYPE_COUNT = sizeof(PLA_SUBTYPES) / sizeof(PLA_SUBTYPES[0]);
+const char* PETG_SUBTYPES[] = { "Basic", "Translucent", "HF" };
+const uint8_t PETG_SUBTYPE_COUNT = sizeof(PETG_SUBTYPES) / sizeof(PETG_SUBTYPES[0]);
+
+bool osMaterialHasSubtypes(uint8_t matIdx) {
+  return (matIdx == 0 || matIdx == 1);
+}
+
+const char** osSubtypeList(uint8_t matIdx, uint8_t &count) {
+  if (matIdx == 0) { count = PLA_SUBTYPE_COUNT;  return PLA_SUBTYPES; }
+  if (matIdx == 1) { count = PETG_SUBTYPE_COUNT; return PETG_SUBTYPES; }
+  count = 0;
+  return nullptr;
+}
 const char* OS_MANUFACTURERS[] = {
   "Generic", "Snapmaker", "SUNLU", "eSun", "Jayo", "QIDI", "Bambu Lab",
   "Polymaker", "TECBEARS", "GIANTARM", "HATCHBOX", "Overture", "Prusament",
@@ -330,6 +352,15 @@ const uint8_t ACE_WEIGHT_COUNT = 4;
 uint8_t osEntryMatIdx = 0;   // index into OS_MATERIALS
 uint8_t osEntryMfgIdx = 0;   // index into OS_MANUFACTURERS
 uint8_t osEntryColIdx = 1;   // index into QIDI_COLORS (1..24, matches nearestColorName range)
+uint8_t osEntrySubIdx = 0;   // index into PLA_SUBTYPES or PETG_SUBTYPES (only used if osMaterialHasSubtypes)
+uint8_t osSubtypePickerPage = 0;
+
+const char* osCurrentSubtype() {
+  uint8_t count;
+  const char** list = osSubtypeList(osEntryMatIdx, count);
+  if (!list || osEntrySubIdx >= count) return "Basic";
+  return list[osEntrySubIdx];
+}
 int     osEntryBedMin = OS_MATERIALS[0].bedMin;
 int     osEntryBedMax = OS_MATERIALS[0].bedMax;
 int     osEntryNozMin = OS_MATERIALS[0].nozzleMin;
@@ -366,6 +397,14 @@ bool   wifiConnected    = false;
 String wifiCurrentSSID  = "";
 String wifiCurrentIP    = "";
 
+// ── U1 connection state ─────────────────────────────────────
+String u1Host = "";
+enum U1TestResult { U1_TEST_NONE, U1_TEST_OK, U1_TEST_FAIL };
+U1TestResult u1TestResult = U1_TEST_NONE;
+
+enum U1SendResult { U1_SEND_NONE, U1_SEND_OK, U1_SEND_FAIL };
+U1SendResult u1SendResult = U1_SEND_NONE;
+
 #define WIFI_SCAN_MAX 20
 String  wifiScanSSIDs[WIFI_SCAN_MAX];
 bool    wifiScanOpen[WIFI_SCAN_MAX];
@@ -378,6 +417,7 @@ String kbTargetSSID = "";
 bool   kbIsPassword = false;
 bool   kbShift      = false;
 bool   kbSymbols    = false;
+bool   kbForU1      = false;
 
 // ── Screensaver ─────────────────────────────────────────────
 unsigned long lastActivityMs = 0;
@@ -464,6 +504,84 @@ void clearWifiCreds() {
   prefs.begin("k9wifi", false);
   prefs.clear();
   prefs.end();
+}
+
+void saveU1Host(const String& host) {
+  prefs.begin("k9u1", false);
+  prefs.putString("host", host);
+  prefs.end();
+}
+
+bool loadU1Host(String& host) {
+  prefs.begin("k9u1", true);
+  host = prefs.getString("host", "");
+  prefs.end();
+  return host.length() > 0;
+}
+
+bool u1TestConnection(const String& host) {
+  if (host.length() == 0) return false;
+  HTTPClient http;
+  String url = "http://" + host + ":7125/printer/info";
+  http.begin(url);
+  http.setTimeout(3000);
+  int code = http.GET();
+  http.end();
+  return (code == 200);
+}
+
+bool u1SendFilamentConfig(const String& host, uint8_t slot, const String& vendor,
+                           const String& type, const String& subtype, const String& colorHex) {
+  Serial.println("[U1-SEND] --- start ---");
+  Serial.print("[U1-SEND] wifiConnected="); Serial.println(wifiConnected ? "true" : "false");
+  Serial.print("[U1-SEND] host=["); Serial.print(host); Serial.println("]");
+
+  if (host.length() == 0) {
+    Serial.println("[U1-SEND] FAIL: no host configured (Settings > U1 Connection is empty)");
+    return false;
+  }
+  if (!wifiConnected) {
+    Serial.println("[U1-SEND] FAIL: WiFi not connected");
+    return false;
+  }
+
+  String command = "SET_PRINT_FILAMENT_CONFIG CONFIG_EXTRUDER=" + String(slot) +
+                    " VENDOR='" + vendor + "'" +
+                    " FILAMENT_TYPE='" + type + "'" +
+                    " FILAMENT_SUBTYPE='" + (subtype.length() ? subtype : "Basic") + "'" +
+                    " FILAMENT_COLOR_RGBA=" + colorHex;
+  Serial.print("[U1-SEND] gcode command: "); Serial.println(command);
+
+  String url = "http://" + host + ":7125/printer/gcode/script?script=";
+  String encoded = "";
+  const char* hex = "0123456789ABCDEF";
+  for (size_t i = 0; i < command.length(); i++) {
+    char c = command[i];
+    if (isalnum((unsigned char)c) || c == '-' || c == '_' || c == '.' || c == '~') {
+      encoded += c;
+    } else {
+      encoded += '%';
+      encoded += hex[((uint8_t)c) >> 4];
+      encoded += hex[((uint8_t)c) & 0x0F];
+    }
+  }
+  url += encoded;
+  Serial.print("[U1-SEND] full URL: "); Serial.println(url);
+
+  HTTPClient http;
+  http.begin(url);
+  http.setTimeout(5000);
+  int code = http.GET();
+  String body = http.getString();
+  http.end();
+
+  Serial.print("[U1-SEND] HTTP code: "); Serial.println(code);
+  Serial.print("[U1-SEND] response body: "); Serial.println(body);
+
+  bool ok = (code == 200 && body.indexOf("\"result\"") >= 0 && body.indexOf("ok") >= 0);
+  Serial.println(ok ? "[U1-SEND] SUCCESS" : "[U1-SEND] FAIL: bad code or unexpected response body");
+  Serial.println("[U1-SEND] --- end ---");
+  return ok;
 }
 
 void wifiEventHandler(WiFiEvent_t event, WiFiEventInfo_t info) {
@@ -709,6 +827,28 @@ if (currentScreen != SCR_OPENSPOOL) {
 // ============================================================
 //  OPENSPOOL MANUAL ENTRY SCREEN
 // ============================================================
+void drawOpenSpoolSlotPicker() {
+  tft.fillScreen(C_BG);
+  drawHeader("K-9 — Select U1 Slot");
+
+  const int tileW = 130, tileH = 60, gapX = 20, gapY = 16, x0 = 20, y0 = 40;
+  for (uint8_t i = 0; i < 4; i++) {
+    uint8_t col = i % 2;
+    uint8_t row = i / 2;
+    int x = x0 + col * (tileW + gapX);
+    int y = y0 + row * (tileH + gapY);
+    char label[8];
+    snprintf(label, sizeof(label), "SLOT %d", i + 1);
+    uint16_t bg = C_CARD;
+    if (u1SendResult == U1_SEND_OK)   bg = C_GREEN;
+    if (u1SendResult == U1_SEND_FAIL) bg = C_RED;
+    drawButton(x, y, tileW, tileH, bg, label, C_TEXT);
+  }
+
+  drawFooter("K-9  mark 1  -  Built by Joe the Builder", C_MUTED);
+  drawButton(10, 176, 300, 34, C_ORANGE_D, "BACK", C_TEXT);
+}
+
 void drawOpenSpoolEntry() {
   tft.fillScreen(C_BG);
   drawHeader("K-9 — Manual Entry");
@@ -791,7 +931,13 @@ void drawOpenSpoolEntry() {
     tft.drawString("MATERIAL — tap to change", 14, 72, 1);
     tft.setTextDatum(MC_DATUM);
     tft.setTextColor(C_ORANGE, C_CARD);
-    tft.drawString(OS_MATERIALS[osEntryMatIdx].name, W/2, 90, 2);
+    if (osMaterialHasSubtypes(osEntryMatIdx) && strcmp(osCurrentSubtype(), "Basic") != 0) {
+      char matBuf[32];
+      snprintf(matBuf, sizeof(matBuf), "%s - %s", OS_MATERIALS[osEntryMatIdx].name, osCurrentSubtype());
+      tft.drawString(matBuf, W/2, 90, 2);
+    } else {
+      tft.drawString(OS_MATERIALS[osEntryMatIdx].name, W/2, 90, 2);
+    }
 
     tft.fillRect(10, 106, W-20, 34, C_CARD);
     tft.drawRect(10, 106, W-20, 34, C_ORANGE_D);
@@ -818,7 +964,6 @@ void drawOpenSpoolEntry() {
     drawButton(10, 144, 26, 26, C_ORANGE_D, "-", C_TEXT);
     drawButton(W-36, 144, 26, 26, C_ORANGE_D, "+", C_TEXT);
   }
-
   drawFooter("K-9  mark 1  -  Built by Joe the Builder", C_MUTED);
 
   uint16_t saveBg = C_ORANGE;
@@ -826,9 +971,10 @@ void drawOpenSpoolEntry() {
   if (tagStatus == TAG_WRITE_OK)   { saveBg = C_GREEN; saveFg = C_BLACK; }
   if (tagStatus == TAG_WRITE_FAIL) { saveBg = C_RED;   saveFg = C_WHITE; }
 
-  drawButton(10,  176, 90, 34, C_CARD,     "BACK", C_TEXT);
-  drawButton(115, 176, 90, 34, saveBg,     "SAVE", saveFg);
-  drawButton(220, 176, 90, 34, C_ORANGE_D, "READ", C_TEXT);
+  drawButton(10,  176, 68, 34, C_CARD,     "BACK", C_TEXT);
+  drawButton(83,  176, 68, 34, saveBg,     "SAVE", saveFg);
+  drawButton(156, 176, 68, 34, C_ORANGE,   "SEND", C_BLACK);
+  drawButton(229, 176, 81, 34, C_ORANGE_D, "READ", C_TEXT);
 }
 // ============================================================
 //  ANYCUBIC MANUAL ENTRY SCREEN
@@ -1084,6 +1230,42 @@ void drawOpenSpoolMaterialPicker() {
   drawButton(115, 176, 90, 34, C_ORANGE_D, "<",    C_TEXT);
   drawButton(220, 176, 90, 34, C_ORANGE_D, ">",    C_TEXT);
 }
+void drawOpenSpoolSubtypePicker() {
+  tft.fillScreen(C_BG);
+  drawHeader("K-9 — Select Subtype");
+
+  uint8_t count;
+  const char** list = osSubtypeList(osEntryMatIdx, count);
+
+  const uint8_t cols = 3, rows = 3;
+  const int tileW = 96, tileH = 40, gap = 4, x0 = 10, y0 = 30;
+  const uint8_t perPage = cols * rows;
+  uint8_t totalPages = list ? (count + perPage - 1) / perPage : 1;
+  if (osSubtypePickerPage >= totalPages) osSubtypePickerPage = totalPages - 1;
+
+  uint8_t startIdx = osSubtypePickerPage * perPage;
+  for (uint8_t i = 0; i < perPage; i++) {
+    uint8_t idx = startIdx + i;
+    if (!list || idx >= count) continue;
+    uint8_t col = i % cols; uint8_t row = i / cols;
+    int x = x0 + col * (tileW + gap); int y = y0 + row * (tileH + gap);
+    bool selected = (idx == osEntrySubIdx);
+    tft.fillRect(x, y, tileW, tileH, selected ? C_ORANGE : C_CARD);
+    tft.drawRect(x, y, tileW, tileH, C_ORANGE_D);
+    tft.setTextDatum(MC_DATUM);
+    tft.setTextColor(selected ? C_BLACK : C_TEXT, selected ? C_ORANGE : C_CARD);
+    tft.drawString(list[idx], x + tileW/2, y + tileH/2, 1);
+  }
+
+  char pageBuf[24];
+  snprintf(pageBuf, sizeof(pageBuf), "Page %d / %d", osSubtypePickerPage + 1, totalPages);
+  drawFooter(pageBuf, C_MUTED);
+
+  drawButton(10,  176, 90, 34, C_CARD,     "BACK", C_TEXT);
+  drawButton(115, 176, 90, 34, C_ORANGE_D, "<",    C_TEXT);
+  drawButton(220, 176, 90, 34, C_ORANGE_D, ">",    C_TEXT);
+}
+
 void drawOpenSpoolManufacturerPicker() {
   tft.fillScreen(C_BG);
   drawHeader("K-9 — Select Manufacturer");
@@ -1337,10 +1519,11 @@ void drawSettings() {
   tft.fillScreen(C_BG);
   drawHeader("K-9 — Settings");
 
-  const int x = 10, w = W - 20, h = 24, gap = 4;
+  const int x = 10, w = W - 20, h = 20, gap = 4;
   int y = 30;
 
   drawButton(x, y, w, h, C_CARD, "WIFI", C_ORANGE);              y += h + gap;
+  drawButton(x, y, w, h, C_CARD, "U1 CONNECTION", C_MUTED);      y += h + gap;
   drawButton(x, y, w, h, C_CARD, "BACKLIGHT", C_MUTED);          y += h + gap;
   drawButton(x, y, w, h, C_CARD, "NFC STATUS", C_MUTED);         y += h + gap;
   drawButton(x, y, w, h, C_CARD, "TOUCH CALIBRATION", C_MUTED);  y += h + gap;
@@ -1503,8 +1686,45 @@ void drawNfcStatus() {
 
   drawFooter("K-9  mark 1  -  Built by Joe the Builder", C_MUTED);
 
-  drawButton(10,  176, 145, 34, C_CARD,     "BACK",      C_TEXT);
+ drawButton(10,  176, 145, 34, C_CARD,     "BACK",      C_TEXT);
   drawButton(165, 176, 145, 34, C_ORANGE_D, "SCAN TEST", C_TEXT);
+}
+
+// ============================================================
+//  U1 CONNECTION SCREEN
+// ============================================================
+void drawU1Connection() {
+  tft.fillScreen(C_BG);
+  drawHeader("K-9 — U1 Connection");
+
+  tft.fillRect(10, 30, W-20, 60, C_CARD);
+  tft.drawRect(10, 30, W-20, 60, C_ORANGE_D);
+  tft.setTextDatum(TL_DATUM);
+  tft.setTextColor(C_MUTED, C_CARD);
+  tft.drawString("U1 HOST — tap to edit", 18, 38, 1);
+  tft.setTextDatum(MC_DATUM);
+  tft.setTextColor(C_ORANGE, C_CARD);
+  tft.drawString(u1Host.length() ? u1Host.c_str() : "(not set)", W/2, 68, 2);
+
+  tft.setTextDatum(TL_DATUM);
+  tft.setTextColor(C_MUTED, C_BG);
+  tft.drawString("TEST RESULT", 18, 100, 1);
+  tft.setTextDatum(MC_DATUM);
+  if (u1TestResult == U1_TEST_OK) {
+    tft.setTextColor(C_GREEN, C_BG);
+    tft.drawString("CONNECTED", W/2, 122, 2);
+  } else if (u1TestResult == U1_TEST_FAIL) {
+    tft.setTextColor(C_RED, C_BG);
+    tft.drawString("CONNECTION FAILED", W/2, 122, 2);
+  } else {
+    tft.setTextColor(C_MUTED, C_BG);
+    tft.drawString("Not tested yet", W/2, 122, 1);
+  }
+
+  drawFooter("K-9  mark 1  -  Built by Joe the Builder", C_MUTED);
+
+  drawButton(10,  176, 145, 34, C_CARD,     "BACK",           C_TEXT);
+  drawButton(165, 176, 145, 34, C_ORANGE_D, "TEST CONNECTION", C_TEXT);
 }
 
 // ============================================================
@@ -1589,14 +1809,14 @@ void drawWifiScan() {
 // ============================================================
 void drawWifiKeyboard() {
   tft.fillScreen(C_BG);
-  drawHeader(kbIsPassword ? "K-9 — Enter Password" : "K-9 — Enter SSID");
+  drawHeader(kbForU1 ? "K-9 — Enter U1 Host" : (kbIsPassword ? "K-9 — Enter Password" : "K-9 — Enter SSID"));
 
   tft.fillRect(10, 30, W-20, 24, C_CARD);
   tft.drawRect(10, 30, W-20, 24, C_ORANGE_D);
   tft.setTextDatum(MC_DATUM);
   tft.setTextColor(C_ORANGE, C_CARD);
   String preview = kbBuffer;
-  if (preview.length() == 0) preview = kbIsPassword ? "(password)" : "(network name)";
+  if (preview.length() == 0) preview = kbForU1 ? "(u1 host or IP)" : (kbIsPassword ? "(password)" : "(network name)");
   tft.drawString(preview.c_str(), W/2, 42, 2);
 
   const char* row1  = "1234567890";
@@ -1934,6 +2154,7 @@ bool openSpoolWriteTag() {
   doc["protocol"]     = "openspool";
   doc["brand"]        = tagData.manufacturer[0] ? tagData.manufacturer : "Generic";
   doc["type"]         = tagData.material[0] ? tagData.material : "PLA";
+  doc["subtype"]      = osCurrentSubtype();
   doc["color_hex"]    = hexColor;
   doc["min_temp"]     = tagData.extMin;
   doc["max_temp"]     = tagData.extMax;
@@ -2069,6 +2290,7 @@ void setup() {
   if (loadWifiCreds(savedSsid, savedPass)) {
     attemptWifiConnect(savedSsid, savedPass, 8000);
   }
+  loadU1Host(u1Host);
 
   lastActivityMs = millis();
 }
@@ -2365,7 +2587,10 @@ case SCR_QIDI:
     aceEntryShowingRead = false;
     strncpy(tagData.manufacturer, "AC", sizeof(tagData.manufacturer));
     strncpy(tagData.material, OS_MATERIALS[aceEntryMatIdx].name, sizeof(tagData.material));
-    
+
+    tagData.r = aceEntryIsCustom ? aceCustomR : ANYCUBIC_COLORS[aceEntryColIdx][0];
+    tagData.g = aceEntryIsCustom ? aceCustomG : ANYCUBIC_COLORS[aceEntryColIdx][1];
+    tagData.b = aceEntryIsCustom ? aceCustomB : ANYCUBIC_COLORS[aceEntryColIdx][2];
     snprintf(tagData.color, sizeof(tagData.color), "FF%02X%02X%02X", tagData.r, tagData.g, tagData.b);
     tagData.extMin = aceEntryNozMin; tagData.extMax = aceEntryNozMax;
     tagData.bedMin = aceEntryBedMin; tagData.bedMax = aceEntryBedMax;
@@ -2554,8 +2779,16 @@ break;
             osEntryNozMax = OS_MATERIALS[idx].nozzleMax;
             osEntryBedMin = OS_MATERIALS[idx].bedMin;
             osEntryBedMax = OS_MATERIALS[idx].bedMax;
-            currentScreen = SCR_OPENSPOOL_ENTRY;
-            drawOpenSpoolEntry();
+            if (osMaterialHasSubtypes(idx)) {
+              osEntrySubIdx = 0;
+              osSubtypePickerPage = 0;
+              currentScreen = SCR_OPENSPOOL_SUBTYPE_PICKER;
+              drawOpenSpoolSubtypePicker();
+            } else {
+              osEntrySubIdx = 0;
+              currentScreen = SCR_OPENSPOOL_ENTRY;
+              drawOpenSpoolEntry();
+            }
             tileTapped = true;
           }
         }
@@ -2569,6 +2802,40 @@ break;
           } else if (hit(220, 176, 90, 34, tx, ty)) {
             osMaterialPickerPage = (osMaterialPickerPage + 1) % totalPages;
             drawOpenSpoolMaterialPicker();
+          }
+        }
+        break;
+      }
+      case SCR_OPENSPOOL_SUBTYPE_PICKER: {
+        uint8_t count;
+        const char** list = osSubtypeList(osEntryMatIdx, count);
+        const uint8_t cols = 3, rows = 3;
+        const int tileW = 96, tileH = 40, gap = 4, x0 = 10, y0 = 30;
+        const uint8_t perPage = cols * rows;
+        uint8_t totalPages = list ? (count + perPage - 1) / perPage : 1;
+        bool tileTapped = false;
+        for (uint8_t i = 0; i < perPage && !tileTapped; i++) {
+          uint8_t idx = osSubtypePickerPage * perPage + i;
+          if (!list || idx >= count) continue;
+          uint8_t col = i % cols; uint8_t row = i / cols;
+          int x = x0 + col * (tileW + gap); int y = y0 + row * (tileH + gap);
+          if (hit(x, y, tileW, tileH, tx, ty)) {
+            osEntrySubIdx = idx;
+            currentScreen = SCR_OPENSPOOL_ENTRY;
+            drawOpenSpoolEntry();
+            tileTapped = true;
+          }
+        }
+        if (!tileTapped) {
+          if (hit(10, 176, 90, 34, tx, ty)) {
+            currentScreen = SCR_OPENSPOOL_ENTRY;
+            drawOpenSpoolEntry();
+          } else if (hit(115, 176, 90, 34, tx, ty)) {
+            osSubtypePickerPage = (osSubtypePickerPage == 0) ? totalPages - 1 : osSubtypePickerPage - 1;
+            drawOpenSpoolSubtypePicker();
+          } else if (hit(220, 176, 90, 34, tx, ty)) {
+            osSubtypePickerPage = (osSubtypePickerPage + 1) % totalPages;
+            drawOpenSpoolSubtypePicker();
           }
         }
         break;
@@ -2667,13 +2934,13 @@ break;
           osEntryNozMin += 5; osEntryNozMax += 5;
           drawOpenSpoolEntry();
         }
-        else if (hit(10, 176, 90, 34, tx, ty)) {
+        else if (hit(10, 176, 68, 34, tx, ty)) {
           osEntryShowingRead = false;
           currentScreen = SCR_OPENSPOOL;
           osTagPresent = false;
           drawSubMenu("K-9 — OpenSpool U1");
         }
-        else if (hit(115, 176, 90, 34, tx, ty)) {
+        else if (hit(83, 176, 68, 34, tx, ty)) {
           osEntryShowingRead = false;
           strncpy(tagData.manufacturer, OS_MANUFACTURERS[osEntryMfgIdx], sizeof(tagData.manufacturer));
           strncpy(tagData.material, OS_MATERIALS[osEntryMatIdx].name, sizeof(tagData.material));
@@ -2693,7 +2960,7 @@ break;
           tagStatus = TAG_NONE;
           drawOpenSpoolEntry();
         }
-        else if (hit(220, 176, 90, 34, tx, ty)) {
+       else if (hit(229, 176, 81, 34, tx, ty)) {
           drawFooter("Hold tag to read...", C_ORANGE);
           uint8_t uid[7]; uint8_t uidLen;
           if (waitForTag(uid, &uidLen, 5000)) {
@@ -2724,6 +2991,38 @@ break;
             osEntryShowingRead = false;
             drawOpenSpoolEntry();
           }
+        }
+        else if (hit(156, 176, 68, 34, tx, ty)) {
+          u1SendResult = U1_SEND_NONE;
+          currentScreen = SCR_OPENSPOOL_SLOT_PICKER;
+          drawOpenSpoolSlotPicker();
+        }
+        break;
+      }
+      case SCR_OPENSPOOL_SLOT_PICKER: {
+        const int tileW = 130, tileH = 60, gapX = 20, gapY = 16, x0 = 20, y0 = 40;
+        bool tileTapped = false;
+        for (uint8_t i = 0; i < 4 && !tileTapped; i++) {
+          uint8_t col = i % 2;
+          uint8_t row = i / 2;
+          int x = x0 + col * (tileW + gapX);
+          int y = y0 + row * (tileH + gapY);
+         if (hit(x, y, tileW, tileH, tx, ty)) {
+            tileTapped = true;
+            drawFooter("Sending...", C_ORANGE);
+            String vendor = OS_MANUFACTURERS[osEntryMfgIdx];
+            String type   = OS_MATERIALS[osEntryMatIdx].name;
+            char colorHex[9];
+            snprintf(colorHex, sizeof(colorHex), "%02X%02X%02X%02X",
+                     QIDI_COLORS[osEntryColIdx].r, QIDI_COLORS[osEntryColIdx].g, QIDI_COLORS[osEntryColIdx].b, 0xFF);
+            bool ok = u1SendFilamentConfig(u1Host, i, vendor, type, String(osCurrentSubtype()), String(colorHex));
+            u1SendResult = ok ? U1_SEND_OK : U1_SEND_FAIL;
+            drawOpenSpoolSlotPicker();
+          }
+        }
+        if (!tileTapped && hit(10, 176, 300, 34, tx, ty)) {
+          currentScreen = SCR_OPENSPOOL_ENTRY;
+          drawOpenSpoolEntry();
         }
         break;
       }
@@ -2899,44 +3198,46 @@ break;
      break;
       }
      case SCR_SETTINGS: {
-        const int x = 10, w = W - 20, h = 24, gap = 4;
+        const int x = 10, w = W - 20, h = 20, gap = 4;
         int y0 = 30;
         if (hit(x, y0 + 0*(h+gap), w, h, tx, ty)) {
           currentScreen = SCR_WIFI;
           drawWifi();
         }
         else if (hit(x, y0 + 1*(h+gap), w, h, tx, ty)) {
-          currentScreen = SCR_BACKLIGHT;
-          drawBacklight();
-        }
-       else if (hit(x, y0 + 1*(h+gap), w, h, tx, ty)) {
-          currentScreen = SCR_BACKLIGHT;
-          drawBacklight();
+          u1TestResult = U1_TEST_NONE;
+          currentScreen = SCR_U1_CONNECTION;
+          drawU1Connection();
         }
         else if (hit(x, y0 + 2*(h+gap), w, h, tx, ty)) {
+          currentScreen = SCR_BACKLIGHT;
+          drawBacklight();
+        }
+        else if (hit(x, y0 + 3*(h+gap), w, h, tx, ty)) {
           nfcTestResult = NFC_TEST_NONE;
           currentScreen = SCR_NFC_STATUS;
           drawNfcStatus();
         }
-        else if (hit(x, y0 + 3*(h+gap), w, h, tx, ty)) {
+        else if (hit(x, y0 + 4*(h+gap), w, h, tx, ty)) {
           touchCalStep = 0;
           currentScreen = SCR_TOUCH_CAL;
           drawTouchCal();
         }
-        else if (hit(x, y0 + 4*(h+gap), w, h, tx, ty)) {
+        else if (hit(x, y0 + 5*(h+gap), w, h, tx, ty)) {
           currentScreen = SCR_FIRMWARE_INFO;
           drawFirmwareInfo();
         }
-        else if (hit(x, y0 + 5*(h+gap), w, h, tx, ty)) {
+        else if (hit(x, y0 + 6*(h+gap), w, h, tx, ty)) {
           currentScreen = SCR_FACTORY_CONFIRM;
           drawFactoryConfirm();
         }
-        else if (hit(x, y0 + 6*(h+gap), w, h, tx, ty)) {
+        else if (hit(x, y0 + 7*(h+gap), w, h, tx, ty)) {
           currentScreen = SCR_MAIN;
           drawMain();
         }
         break;
       }
+    
       case SCR_FIRMWARE_INFO: {
         if (hit(10, 176, 300, 34, tx, ty)) {
           currentScreen = SCR_SETTINGS;
@@ -2999,6 +3300,28 @@ break;
             nfcTestResult = NFC_TEST_NOT_FOUND;
           }
           drawNfcStatus();
+        }
+        break;
+      }
+      case SCR_U1_CONNECTION: {
+        if (hit(10, 30, W-20, 60, tx, ty)) {
+          kbBuffer = u1Host;
+          kbForU1 = true;
+          kbIsPassword = false;
+          kbShift = false;
+          kbSymbols = false;
+          currentScreen = SCR_WIFI_KEYBOARD;
+          drawWifiKeyboard();
+        }
+        else if (hit(10, 176, 145, 34, tx, ty)) {
+          currentScreen = SCR_SETTINGS;
+          drawSettings();
+        }
+        else if (hit(165, 176, 145, 34, tx, ty)) {
+          drawFooter("Testing connection...", C_ORANGE);
+          bool ok = u1TestConnection(u1Host);
+          u1TestResult = ok ? U1_TEST_OK : U1_TEST_FAIL;
+          drawU1Connection();
         }
         break;
       }
@@ -3110,9 +3433,13 @@ break;
         if (keyTapped) {
           drawWifiKeyboard();
         }
-        else if (hit(10, 176, 48, 34, tx, ty)) {
+       else if (hit(10, 176, 48, 34, tx, ty)) {
           kbBuffer = "";
-          if (kbIsPassword) {
+          if (kbForU1) {
+            kbForU1 = false;
+            currentScreen = SCR_U1_CONNECTION;
+            drawU1Connection();
+          } else if (kbIsPassword) {
             currentScreen = SCR_WIFI_SCAN;
             drawWifiScan();
           } else {
@@ -3136,8 +3463,15 @@ break;
           if (kbBuffer.length() > 0) kbBuffer.remove(kbBuffer.length() - 1);
           drawWifiKeyboard();
         }
-        else if (hit(278, 176, 32, 34, tx, ty)) {
-          if (kbIsPassword) {
+       else if (hit(278, 176, 32, 34, tx, ty)) {
+          if (kbForU1) {
+            u1Host = kbBuffer;
+            saveU1Host(u1Host);
+            kbForU1 = false;
+            u1TestResult = U1_TEST_NONE;
+            currentScreen = SCR_U1_CONNECTION;
+            drawU1Connection();
+          } else if (kbIsPassword) {
             drawFooter("Connecting...", C_ORANGE);
             bool ok = attemptWifiConnect(kbTargetSSID, kbBuffer, 10000);
             if (ok) saveWifiCreds(kbTargetSSID, kbBuffer);
